@@ -9,6 +9,7 @@ import { getModelMeta } from "../models/registry";
 import { BikeScene } from "./BikeScene";
 import { BikeProfile2D } from "./BikeProfile2D";
 import { ViewerErrorBoundary } from "./ViewerErrorBoundary";
+import { reportClientError } from "@/lib/monitoring/client";
 import { detectWebGL, isLowPowerDevice } from "./webgl";
 import type { CameraCommand } from "./CameraRig";
 
@@ -110,6 +111,7 @@ export default function BikeViewer({
     >
       {mode === "3d" ? (
         <ViewerErrorBoundary
+          model={meta.key}
           fallback={(error) => {
             queueMicrotask(() => setFailed(error.message || "3D model failed to load"));
             return null;
@@ -122,6 +124,18 @@ export default function BikeViewer({
             camera={{ position: meta.cameraPresets[0].position, fov: 32, near: 0.05, far: 40 }}
             gl={{ antialias: !lowPower, powerPreference: "high-performance", alpha: true }}
             onPointerMissed={() => interactive && onSelectSlot?.(null)}
+            onCreated={({ gl }) => {
+              const canvas = gl.domElement;
+              canvas.addEventListener(
+                "webglcontextlost",
+                () => {
+                  // R3F deliberately drops the context when the viewer unmounts (navigation);
+                  // only a loss while the canvas is still on the page is a real failure.
+                  setTimeout(() => canvas.isConnected && reportClientError("webgl-context-lost", "WebGL context lost", { model: meta.key }), 0);
+                },
+                { once: true },
+              );
+            }}
             aria-label={`Interactive 3D model — ${meta.label}`}
           >
             <PerformanceMonitor onDecline={() => setDpr(1)} onIncline={() => setDpr(1.5)} />

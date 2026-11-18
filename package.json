@@ -11,12 +11,16 @@
     "test": "vitest run tests/unit",
     "test:db": "vitest run tests/db",
     "test:watch": "vitest",
+    "test:e2e": "node tests/e2e/journey.e2e.mjs",
+    "test:e2e:security": "node tests/e2e/security.e2e.mjs",
     "db:local": "scripts/db-local.sh start",
     "db:local:stop": "scripts/db-local.sh stop",
     "db:seed:build": "tsx scripts/build-seed.ts",
     "db:types": "supabase gen types typescript --local --schema public > src/types/database.ts",
+    "db:push:dry": "supabase db push --dry-run",
     "model:generate": "tsx scripts/generate-placeholder-model.mts",
     "catalog:import": "tsx scripts/import-catalog.ts",
+    "env:check": "tsx scripts/check-env.ts",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {

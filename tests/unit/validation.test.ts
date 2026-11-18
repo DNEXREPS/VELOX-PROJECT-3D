@@ -98,7 +98,8 @@ describe("configuration & maintenance validation", () => {
 });
 
 describe("upload validation", () => {
-  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+  // Signature + IHDR chunk header with a 1×1 size (the minimum the dimension check needs).
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1]);
   const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0]);
   const webp = new Uint8Array([0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4, 0x57, 0x45, 0x42, 0x50]);
   const svg = new TextEncoder().encode("<svg onload=alert(1)>");

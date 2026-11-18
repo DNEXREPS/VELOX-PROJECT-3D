@@ -25,11 +25,16 @@ src/
     validation/             Zod schemas (forms + server actions + catalogue files)
     domain/                 slots, enums (kept in sync with SQL by tests)
     supabase/               server/browser clients
+    security/               CSP builder, image-host allow-list, bearer check
+    monitoring/             scrubbed structured events (server) + browser beacons
+    storage-cleanup.ts      cleanup worker logic (pagination, scope checks)
   server/                   Server-only: auth (session DAL), queries/, actions/ (Server Actions), storage
   types/                    database.ts (generated), domain.ts
-  proxy.ts                  Session refresh + route gating (Next 16 "proxy", formerly middleware)
+  proxy.ts                  Per-request CSP nonce, session refresh, route gating (Next 16 "proxy")
+  instrumentation.ts        Server error capture (onRequestError → monitoring)
 supabase/
-  migrations/               Version-controlled SQL (0100 → 0700)
+  migrations/               Version-controlled SQL (0100 → 0800), additive only (guarded by a unit test)
+  templates/                Auth e-mail templates (token-hash links)
   catalog/                  categories.json + demo-catalog.json (source for seed.sql)
   seed.sql                  Generated — categories + clearly labelled demo catalogue
   tests/supabase-shim.sql   Minimal auth/storage/roles shim for vanilla Postgres tests
@@ -55,6 +60,8 @@ Rendering logic (`features/studio/three`) never imports business logic; it recei
 | `maintenance_records` / `maintenance_photos` | Owner-only. Distance & cost optional. Check constraints for dates and currencies. |
 | `community_posts`, `post_likes`, `post_comments`, `user_follows`, `bookmarks`, `content_reports` | Community. Status (`published/hidden/removed`) for moderation. |
 
+Internal (schema `private`, not exposed through the Data API): `rate_limit_rules`, `rate_limit_events`, `storage_cleanup_jobs`.
+
 Public read models (views): `bicycle_passports`, `passport_components`, `passport_revisions`, `passport_maintenance`, `community_feed`, `profile_stats`, `component_catalog`.
 
 ## Security model
@@ -67,9 +74,23 @@ Public read models (views): `bicycle_passports`, `passport_components`, `passpor
 6. **Server Actions** re-validate with Zod, resolve the user via `auth.getUser()` (JWT verified by Supabase Auth) — client-supplied user ids are never trusted. Errors are mapped to safe messages (`fromDbError`).
 7. **Uploads**: server-side size limits + magic-byte type detection (not the client MIME), random object names, bucket MIME/size limits, storage RLS by folder ownership. `bicycle-media` is private: images of private bikes are unreachable; public bikes' images use short-lived signed URLs.
 8. **Moderation**: SECURITY DEFINER functions gated by `is_moderator()`; reports are visible only to reporter + moderators.
-9. No service-role key in the web app. Open-redirect protection on `next` parameters. Security headers in `next.config.ts`.
+9. **Service-role key**: read only by `src/server/supabase-admin.ts` (`server-only`). It is imported only by the scheduled cleanup route, which requires `Authorization: Bearer $CRON_SECRET` (constant-time comparison). A static test enforces this.
+10. **Content Security Policy** (proxy.ts):
+    - Scripts: per-request nonce + `'strict-dynamic'`, no `unsafe-inline` and no `unsafe-eval` in production. Zod runs in jitless mode so it never probes `new Function`.
+    - `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`.
+    - Images: self, data/blob, the Supabase project and allow-listed hosts.
 
-Verified by `tests/db/rls.test.ts` (26 cases) against both a vanilla Postgres 16 + shim and the real Supabase local stack.
+    Other headers: HSTS, COOP and CORP `same-origin`, `nosniff`, `X-Frame-Options: DENY`, Permissions-Policy and `Cache-Control: no-store` on `/api/*`.
+11. **Rate limits** (posts 5/10 min and 20/day, comments 20/10 min and 200/day, reports 10/h and 30/day) are enforced by `BEFORE INSERT` triggers in Postgres. They therefore cover direct PostgREST calls as well as the app, and hold across serverless instances. They are serialised per user with an advisory lock and return SQLSTATE `PT429`, which PostgREST maps to HTTP 429.
+12. **Uploads** (in addition to point 7):
+    - The header is parsed for pixel dimensions; images over 8000 px per side or 40 MP are rejected (decompression-bomb protection).
+    - Avatars are served by public URL, but the bucket can no longer be listed anonymously.
+    - Component image URLs must be `https` (or site-relative) and are rendered only from allow-listed hosts, with `referrerpolicy=no-referrer`.
+13. Open-redirect protection on `next` parameters.
+
+Verified by:
+- `tests/db/rls.test.ts` (26 cases) and `tests/db/hardening.test.ts` (22 cases), against both a vanilla Postgres 16 + shim and the real Supabase local stack.
+- `tests/e2e/security.e2e.mjs` (14 checks) against a production build.
 
 ## Compatibility engine
 
@@ -99,13 +120,27 @@ Matching categories never imply compatibility. Manufacturer-specific logic can b
 
 **ADR-008 Proxy (middleware) is a convenience gate.** `src/proxy.ts` refreshes sessions and redirects anonymous users from protected routes; pages and actions re-check the session, and RLS enforces access regardless.
 
+**ADR-009 Rate limits live in the database.** Clients can reach PostgREST directly with the public key, so a limit in Server Actions alone is bypassable, and in-memory counters do not work on serverless. Triggers on the community tables record events in `private.rate_limit_events`. Limits are rows in `private.rate_limit_rules`, adjustable without a deploy.
+
+**ADR-010 Storage cleanup is a transactional outbox.**
+- Rows are deleted first. Triggers enqueue the affected objects or entity folders in `private.storage_cleanup_jobs` in the same transaction, so a failed delete enqueues nothing and a committed delete always leaves a job.
+- Workers claim jobs (`claim_storage_cleanup_jobs`: lease, `SKIP LOCKED`) and report back (`finish_storage_cleanup_job`: done, or retry with exponential backoff, then `failed` after 8 attempts).
+- There are two workers:
+  - the user's own session, right after the action (`after()`), limited to their own jobs;
+  - the daily Vercel Cron route with the service role.
+- CHECK constraints confine every job to `<owner>/…`, and folder jobs to exactly `<owner>/<uuid>/`. The worker re-checks each listed path before removing it. Listing is paginated and recursive, so folders over 1,000 objects are handled.
+
+**ADR-011 Vendor-neutral monitoring.** Events are scrubbed JSON lines on stderr (Vercel Logs and Log Drains to any provider), with an optional webhook. No SDK in the client bundle. The scrubber removes tokens, keys, emails, URL secrets, sensitive keys (serial, purchase, notes …) and Postgres value echoes. Call sites pass operation names and IDs, never form data.
+
 ## Known gaps / next steps
 
 - **Production 3D assets**: only the procedural placeholder exists (see `docs/3d-assets.md`). Visual replacement beyond tire width needs modular assets.
 - **Real component data**: the importer and provenance model are ready; a sourced dataset (with licences) is not included.
 - **Multiple builds per bicycle**: the schema has `bicycle_builds` with one active build; UI for alternate builds (e.g. winter setup) is not built.
-- **Rate limiting** relies on Supabase Auth limits; app-level limits for community actions (posting/reporting) are not implemented.
+- **Rate limiting** covers posts, comments and reports (DB-enforced). Likes, follows, bookmarks, component submissions and uploads rely on Supabase's platform limits only.
 - **Notifications** (maintenance due emails, comment notifications) are not implemented.
 - **Full-text search** uses `ILIKE`; add `pg_trgm` indexes when the catalogue grows.
 - **Image processing** (resizing/thumbnails) is not implemented; originals ≤ 5 MB are served via signed URLs.
-- **Content-Security-Policy** header is not yet configured.
+- **CSP `style-src` allows `'unsafe-inline'`** (inline `style` attributes from React/Radix/Recharts cannot carry nonces). Script execution remains strictly nonce-based.
+- **Orphan sweep**: uploads whose database row was never written are removed when their folder is deleted, or when compensation is queued. There is no periodic reconciliation of storage against tables.
+- **Monitoring** has no alerting until a Log Drain or `MONITORING_WEBHOOK_URL` is configured (see `docs/deployment/staging.md`).
