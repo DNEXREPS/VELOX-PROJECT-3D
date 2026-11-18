@@ -269,6 +269,28 @@ d("RLS & ownership", () => {
       });
     });
 
+    it("components installed on a bicycle cannot be deleted; riders delete only their own submissions", async () => {
+      const demo = await componentId("demo-r12-chain");
+      await as(ALICE, async (q) => {
+        expect((await q("delete from components where id = $1", [demo])).rowCount).toBe(0);
+        const own = await q(
+          "insert into components (slug, brand_id, category_id, name, created_by) select 'alice-tmp', brand_id, category_id, 'tmp', $1 from components where slug = 'demo-r12-chain' returning id",
+          [ALICE],
+        );
+        expect((await q("delete from components where id = $1", [own.rows[0].id])).rowCount).toBe(1);
+      });
+      const frame = await componentId("demo-endurance-carbon-disc-frame");
+      await admin("insert into bicycle_components (bicycle_id, slot, component_id) values ($1, 'frame', $2)", [bobPublicBike, frame]);
+      try {
+        await as(MOD, async (q) => {
+          // Installed on a bicycle → protected by ON DELETE RESTRICT, even for moderators.
+          await denied(q("delete from components where id = $1", [frame]), /foreign key|violates/);
+        });
+      } finally {
+        await admin("delete from bicycle_components where bicycle_id = $1", [bobPublicBike]);
+      }
+    });
+
     it("moderators can verify and edit any component", async () => {
       const demo = await componentId("demo-r12-chain");
       await as(MOD, async (q) => {
@@ -409,7 +431,8 @@ d("RLS & ownership", () => {
           expect(names).not.toContain(`${ALICE}/${alicePrivateBike}/secret.jpg`);
         });
       } finally {
-        await admin("delete from storage.objects where name like $1", [`${ALICE}/%`]);
+        // Real Supabase blocks direct deletes from storage tables unless explicitly allowed.
+        await admin(`begin; set local storage.allow_delete_query = 'true'; delete from storage.objects where name like '${ALICE}/%'; commit;`);
       }
     });
   });

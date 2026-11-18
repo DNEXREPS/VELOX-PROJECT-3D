@@ -174,11 +174,12 @@ export const componentSubmissionSchema = z
     message: "Currency is required with a price",
   });
 
+// Query-string schemas never throw: invalid values fall back to defaults.
 export const componentQuerySchema = z.object({
-  q: z.preprocess(emptyToUndefined, z.string().trim().max(80).optional()),
-  category: z.preprocess(emptyToUndefined, z.string().regex(/^[a-z0-9-]{2,40}$/).optional()),
-  brand: z.preprocess(emptyToUndefined, z.string().regex(/^[a-z0-9-]{2,60}$/).optional()),
-  slot: z.preprocess(emptyToUndefined, z.enum(BIKE_SLOTS).optional()),
+  q: z.preprocess(emptyToUndefined, z.string().trim().max(80).optional()).catch(undefined),
+  category: z.preprocess(emptyToUndefined, z.string().regex(/^[a-z0-9-]{2,40}$/).optional()).catch(undefined),
+  brand: z.preprocess(emptyToUndefined, z.string().regex(/^[a-z0-9-]{2,60}$/).optional()).catch(undefined),
+  slot: z.preprocess(emptyToUndefined, z.enum(BIKE_SLOTS).optional()).catch(undefined),
   sort: z.enum(["name", "weight_asc", "weight_desc", "price_asc", "price_desc", "newest"]).catch("name"),
   page: z.coerce.number().int().min(1).max(500).catch(1),
 });
@@ -235,9 +236,9 @@ export const reportSchema = z.object({
 });
 
 export const exploreQuerySchema = z.object({
-  q: z.preprocess(emptyToUndefined, z.string().trim().max(80).optional()),
-  category: z.preprocess(emptyToUndefined, z.enum(BICYCLE_CATEGORIES).optional()),
-  brand: z.preprocess(emptyToUndefined, z.string().trim().max(60).optional()),
+  q: z.preprocess(emptyToUndefined, z.string().trim().max(80).optional()).catch(undefined),
+  category: z.preprocess(emptyToUndefined, z.enum(BICYCLE_CATEGORIES).optional()).catch(undefined),
+  brand: z.preprocess(emptyToUndefined, z.string().trim().max(60).optional()).catch(undefined),
   sort: z.enum(["recent", "popular"]).catch("recent"),
   page: z.coerce.number().int().min(1).max(500).catch(1),
 });
@@ -247,3 +248,8 @@ export const exploreQuerySchema = z.object({
 export const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 export const IMAGE_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
+
+/** Next.js searchParams may contain arrays for repeated keys — keep the first value. */
+export function firstParams(sp: Record<string, string | string[] | undefined>): Record<string, string | undefined> {
+  return Object.fromEntries(Object.entries(sp).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]));
+}

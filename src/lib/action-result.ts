@@ -1,18 +1,17 @@
 import type { z } from "zod";
 
-export type ActionResult<T = undefined> =
-  | { ok: true; data: T; message?: string }
-  | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
+export type ActionFailure = { ok: false; error: string; fieldErrors?: Record<string, string[]> };
+export type ActionResult<T = undefined> = { ok: true; data: T; message?: string } | ActionFailure;
 
 export function ok<T>(data: T, message?: string): ActionResult<T> {
   return { ok: true, data, message };
 }
 
-export function fail(error: string, fieldErrors?: Record<string, string[]>): ActionResult<never> {
+export function fail(error: string, fieldErrors?: Record<string, string[]>): ActionFailure {
   return { ok: false, error, fieldErrors };
 }
 
-export function fromZodError(error: z.ZodError): ActionResult<never> {
+export function fromZodError(error: z.ZodError): ActionFailure {
   const fieldErrors: Record<string, string[]> = {};
   for (const issue of error.issues) {
     const key = issue.path.join(".") || "_form";
@@ -22,7 +21,7 @@ export function fromZodError(error: z.ZodError): ActionResult<never> {
 }
 
 /** Maps Postgres / PostgREST errors to safe user-facing messages (no internals leaked). */
-export function fromDbError(error: { code?: string; message?: string } | null | undefined, fallback = "Something went wrong."): ActionResult<never> {
+export function fromDbError(error: { code?: string; message?: string } | null | undefined, fallback = "Something went wrong."): ActionFailure {
   if (!error) return fail(fallback);
   switch (error.code) {
     case "23505":

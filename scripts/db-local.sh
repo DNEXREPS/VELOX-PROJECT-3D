@@ -19,11 +19,7 @@ case "${1:-start}" in
     run_pg "$PGBIN/pg_ctl -D '$DATA' -o '-p $PORT -k /tmp -c listen_addresses=127.0.0.1' -l '$DATA/log' start >/dev/null"
     for _ in $(seq 1 30); do pg_isready -h 127.0.0.1 -p "$PORT" >/dev/null 2>&1 && break; sleep 0.5; done
     psql -h 127.0.0.1 -p "$PORT" -U postgres -qc "create database velox" >/dev/null
-    psql "$URL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/tests/supabase-shim.sql" >/dev/null
-    for f in "$ROOT"/supabase/migrations/*.sql; do
-      psql "$URL" -v ON_ERROR_STOP=1 -q -f "$f" >/dev/null || { echo "Migration failed: $f"; exit 1; }
-    done
-    psql "$URL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/seed.sql" >/dev/null
+    "$ROOT/scripts/db-apply.sh" "$URL"
     echo "$URL"
     ;;
   stop)

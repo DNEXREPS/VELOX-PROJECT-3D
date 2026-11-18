@@ -123,3 +123,21 @@ export async function getDashboard(ctx: Ctx): Promise<DashboardData> {
 }
 
 export { toNumber };
+
+export async function getMaintenancePhotos(ctx: Ctx, recordIds: string[]) {
+  const map = new Map<string, { id: string; url: string | null }[]>();
+  if (recordIds.length === 0) return map;
+  const { data } = await ctx.supabase.from("maintenance_photos").select("id, record_id, storage_path").in("record_id", recordIds).order("created_at");
+  const paths = (data ?? []).map((p) => p.storage_path);
+  const signed = new Map<string, string>();
+  if (paths.length) {
+    const { data: urls } = await ctx.supabase.storage.from("maintenance-media").createSignedUrls(paths, 3600);
+    for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+  }
+  for (const p of data ?? []) {
+    const list = map.get(p.record_id) ?? [];
+    list.push({ id: p.id, url: signed.get(p.storage_path) ?? null });
+    map.set(p.record_id, list);
+  }
+  return map;
+}
