@@ -1,0 +1,368 @@
+{
+  "$comment": "DEMO DATA — every entry below is fictional sample data shipped with VELOX for development and demonstration. Values are illustrative, NOT manufacturer specifications. All components are imported with verification_status = 'demo' and are labelled as demo data throughout the UI.",
+  "brands": [
+    { "slug": "velox-demo-parts", "name": "VELOX Demo Parts", "is_demo": true },
+    { "slug": "velox-demo-works", "name": "VELOX Demo Works", "is_demo": true }
+  ],
+  "components": [
+    {
+      "slug": "demo-endurance-carbon-disc-frame", "brand": "velox-demo-parts", "category": "frames",
+      "name": "Demo Endurance Carbon Disc Frame", "model": "END-C1", "material": "Carbon fibre",
+      "weight_g": 980, "price_reference": 1900, "currency": "EUR",
+      "description": "Sample endurance road frame used to demonstrate the registry and compatibility engine.",
+      "specs": [["frame_type", "Frame type", "Endurance road"], ["sizes", "Sizes", "49, 52, 54, 56, 58"], ["cable_routing", "Cable routing", "Internal"]],
+      "compatibility": { "bb_shell": "bsa_68", "rear_axle": "12x142_ta", "brake_type": "disc", "rear_brake_mount": "flat_mount", "max_rotor_mm": 160, "max_tire_width_mm": 32, "wheel_sizes": ["700c"], "seatpost_diameter_mm": 27.2, "steerer_type": "tapered", "front_derailleur_mount": "braze_on" }
+    },
+    {
+      "slug": "demo-gravel-alloy-frame", "brand": "velox-demo-works", "category": "frames",
+      "name": "Demo Gravel Alloy Frame", "model": "GRV-A2", "material": "Aluminium",
+      "weight_g": 1520, "price_reference": 790, "currency": "EUR",
+      "description": "Sample gravel frame with wide clearance and dual wheel-size support.",
+      "specs": [["frame_type", "Frame type", "Gravel / all-road"], ["mounts", "Mounts", "3 bottle, top tube, fender"]],
+      "compatibility": { "bb_shell": "pf86", "rear_axle": "12x142_ta", "brake_type": "disc", "rear_brake_mount": "flat_mount", "max_rotor_mm": 180, "max_tire_width_mm": 45, "wheel_sizes": ["700c", "650b"], "seatpost_diameter_mm": 27.2, "steerer_type": "tapered", "front_derailleur_mount": "braze_on" }
+    },
+    {
+      "slug": "demo-classic-steel-rim-frame", "brand": "velox-demo-works", "category": "frames",
+      "name": "Demo Classic Steel Rim-Brake Frame", "model": "CLS-S1", "material": "Steel",
+      "weight_g": 1850, "price_reference": 650, "currency": "EUR",
+      "description": "Sample lugged steel frame with rim brakes and quick-release dropouts.",
+      "specs": [["frame_type", "Frame type", "Classic road"]],
+      "compatibility": { "bb_shell": "bsa_68", "rear_axle": "130_qr", "brake_type": "rim", "rear_brake_mount": "rim_caliper", "max_tire_width_mm": 28, "wheel_sizes": ["700c"], "seatpost_diameter_mm": 27.2, "steerer_type": "straight", "front_derailleur_mount": "clamp_31_8" }
+    },
+    {
+      "slug": "demo-carbon-disc-fork", "brand": "velox-demo-parts", "category": "forks",
+      "name": "Demo Carbon Disc Fork", "model": "FK-C1", "material": "Carbon fibre",
+      "weight_g": 390, "price_reference": 420, "currency": "EUR",
+      "specs": [["offset", "Offset", 47, "mm"], ["axle_to_crown", "Axle-to-crown", 370, "mm"]],
+      "compatibility": { "front_axle": "12x100_ta", "brake_type": "disc", "front_brake_mount": "flat_mount", "max_rotor_mm": 160, "max_tire_width_mm": 32, "wheel_sizes": ["700c"], "steerer_type": "tapered", "steerer_diameter_mm": 28.6 }
+    },
+    {
+      "slug": "demo-gravel-carbon-fork", "brand": "velox-demo-works", "category": "forks",
+      "name": "Demo Gravel Carbon Fork", "model": "FK-G2", "material": "Carbon fibre",
+      "weight_g": 450, "price_reference": 380, "currency": "EUR",
+      "specs": [["offset", "Offset", 50, "mm"], ["mounts", "Mounts", "Anything-cage, fender"]],
+      "compatibility": { "front_axle": "12x100_ta", "brake_type": "disc", "front_brake_mount": "flat_mount", "max_rotor_mm": 180, "max_tire_width_mm": 45, "wheel_sizes": ["700c", "650b"], "steerer_type": "tapered", "steerer_diameter_mm": 28.6 }
+    },
+    {
+      "slug": "demo-steel-rim-fork", "brand": "velox-demo-works", "category": "forks",
+      "name": "Demo Steel Rim-Brake Fork", "model": "FK-S1", "material": "Steel",
+      "weight_g": 720, "price_reference": 160, "currency": "EUR",
+      "compatibility": { "front_axle": "100_qr", "brake_type": "rim", "front_brake_mount": "rim_caliper", "max_tire_width_mm": 28, "wheel_sizes": ["700c"], "steerer_type": "straight", "steerer_diameter_mm": 28.6 }
+    },
+    {
+      "slug": "demo-tapered-headset", "brand": "velox-demo-parts", "category": "headsets",
+      "name": "Demo Tapered Integrated Headset", "model": "HS-T1",
+      "weight_g": 85, "price_reference": 45, "currency": "EUR",
+      "compatibility": { "steerer_type": "tapered" }
+    },
+    {
+      "slug": "demo-r12-groupset", "brand": "velox-demo-parts", "category": "groupsets",
+      "name": "Demo R12 Hydraulic Disc Groupset", "model": "R12-HD",
+      "price_reference": 1150, "currency": "EUR",
+      "description": "Reference entry for the demo 12-speed road group. Individual parts are installed per slot.",
+      "specs": [["speeds", "Speeds", 12], ["shifting", "Shifting", "Mechanical"]],
+      "compatibility": { "speeds": 12 }
+    },
+    {
+      "slug": "demo-r12-hydraulic-levers", "brand": "velox-demo-parts", "category": "shifters",
+      "name": "Demo R12 Hydraulic Shift Levers", "model": "R12-ST",
+      "weight_g": 520, "price_reference": 360, "currency": "EUR",
+      "specs": [["actuation", "Brake actuation", "Hydraulic"], ["speeds", "Speeds", 12]],
+      "compatibility": { "speeds": 12, "brake_type": "disc" }
+    },
+    {
+      "slug": "demo-r11-rim-levers", "brand": "velox-demo-works", "category": "shifters",
+      "name": "Demo R11 Rim-Brake Shift Levers", "model": "R11-ST",
+      "weight_g": 440, "price_reference": 210, "currency": "EUR",
+      "specs": [["actuation", "Brake actuation", "Mechanical cable"], ["speeds", "Speeds", 11]],
+      "compatibility": { "speeds": 11, "brake_type": "rim" }
+    },
+    {
+      "slug": "demo-r12-crankset-50-34", "brand": "velox-demo-parts", "category": "cranksets",
+      "name": "Demo R12 Crankset 50/34", "model": "R12-FC", "material": "Aluminium",
+      "weight_g": 705, "price_reference": 290, "currency": "EUR",
+      "specs": [["chainrings", "Chainrings", "50,34", "T"], ["crank_length", "Crank length", 172.5, "mm"], ["spindle", "Spindle", "24 mm"]],
+      "compatibility": { "speeds": 12, "bb_shells": ["bsa_68", "pf86", "t47_86"] }
+    },
+    {
+      "slug": "demo-g12-crankset-40", "brand": "velox-demo-works", "category": "cranksets",
+      "name": "Demo G12 1× Crankset 40T", "model": "G12-FC", "material": "Aluminium",
+      "weight_g": 640, "price_reference": 240, "currency": "EUR",
+      "specs": [["chainrings", "Chainrings", "40", "T"], ["crank_length", "Crank length", 172.5, "mm"]],
+      "compatibility": { "speeds": 12, "bb_shells": ["bsa_68", "pf86"] }
+    },
+    {
+      "slug": "demo-r11-crankset-52-36", "brand": "velox-demo-works", "category": "cranksets",
+      "name": "Demo R11 Crankset 52/36", "model": "R11-FC", "material": "Aluminium",
+      "weight_g": 730, "price_reference": 180, "currency": "EUR",
+      "specs": [["chainrings", "Chainrings", "52,36", "T"], ["crank_length", "Crank length", 172.5, "mm"]],
+      "compatibility": { "speeds": 11, "bb_shells": ["bsa_68"] }
+    },
+    {
+      "slug": "demo-chainring-set-50-34", "brand": "velox-demo-parts", "category": "chainrings",
+      "name": "Demo Chainring Set 50/34", "model": "CR-5034",
+      "weight_g": 140, "price_reference": 95, "currency": "EUR",
+      "specs": [["teeth", "Teeth", "50,34", "T"], ["bcd", "BCD", 110, "mm"]],
+      "compatibility": { "speeds": 12 }
+    },
+    {
+      "slug": "demo-bsa-bottom-bracket", "brand": "velox-demo-parts", "category": "bottom-brackets",
+      "name": "Demo Threaded BSA Bottom Bracket", "model": "BB-BSA24",
+      "weight_g": 72, "price_reference": 35, "currency": "EUR",
+      "compatibility": { "bb_shells": ["bsa_68"] }
+    },
+    {
+      "slug": "demo-r12-cassette-11-34", "brand": "velox-demo-parts", "category": "cassettes",
+      "name": "Demo R12 Cassette 11–34", "model": "R12-CS-1134",
+      "weight_g": 345, "price_reference": 110, "currency": "EUR",
+      "specs": [["cogs", "Cogs", "11,12,13,14,15,17,19,21,24,27,30,34", "T"], ["speeds", "Speeds", 12]],
+      "compatibility": { "speeds": 12, "freehub_body": "shimano_hg", "largest_cog": 34 }
+    },
+    {
+      "slug": "demo-r12-cassette-10-33-xdr", "brand": "velox-demo-works", "category": "cassettes",
+      "name": "Demo R12 Cassette 10–33 (XDR)", "model": "R12-CS-1033",
+      "weight_g": 290, "price_reference": 180, "currency": "EUR",
+      "specs": [["cogs", "Cogs", "10,11,12,13,14,15,17,19,21,24,28,33", "T"], ["speeds", "Speeds", 12]],
+      "compatibility": { "speeds": 12, "freehub_body": "sram_xdr", "largest_cog": 33 }
+    },
+    {
+      "slug": "demo-g12-cassette-10-44-xdr", "brand": "velox-demo-works", "category": "cassettes",
+      "name": "Demo G12 Gravel Cassette 10–44 (XDR)", "model": "G12-CS-1044",
+      "weight_g": 380, "price_reference": 210, "currency": "EUR",
+      "specs": [["cogs", "Cogs", "10,11,13,15,17,19,21,24,28,32,38,44", "T"], ["speeds", "Speeds", 12]],
+      "compatibility": { "speeds": 12, "freehub_body": "sram_xdr", "largest_cog": 44 }
+    },
+    {
+      "slug": "demo-r11-cassette-11-28", "brand": "velox-demo-works", "category": "cassettes",
+      "name": "Demo R11 Cassette 11–28", "model": "R11-CS-1128",
+      "weight_g": 250, "price_reference": 60, "currency": "EUR",
+      "specs": [["cogs", "Cogs", "11,12,13,14,15,17,19,21,23,25,28", "T"], ["speeds", "Speeds", 11]],
+      "compatibility": { "speeds": 11, "freehub_body": "shimano_hg", "largest_cog": 28 }
+    },
+    {
+      "slug": "demo-r12-chain", "brand": "velox-demo-parts", "category": "chains",
+      "name": "Demo R12 Chain", "model": "R12-CN",
+      "weight_g": 252, "price_reference": 45, "currency": "EUR",
+      "specs": [["links", "Links", 116], ["speeds", "Speeds", 12]],
+      "compatibility": { "speeds": 12 }
+    },
+    {
+      "slug": "demo-r11-chain", "brand": "velox-demo-works", "category": "chains",
+      "name": "Demo R11 Chain", "model": "R11-CN",
+      "weight_g": 257, "price_reference": 30, "currency": "EUR",
+      "specs": [["links", "Links", 114], ["speeds", "Speeds", 11]],
+      "compatibility": { "speeds": 11 }
+    },
+    {
+      "slug": "demo-r12-rear-derailleur", "brand": "velox-demo-parts", "category": "derailleurs",
+      "name": "Demo R12 Rear Derailleur", "model": "R12-RD",
+      "weight_g": 262, "price_reference": 150, "currency": "EUR",
+      "specs": [["position", "Position", "Rear"], ["speeds", "Speeds", 12]],
+      "compatibility": { "speeds": 12, "max_cog": 34 }
+    },
+    {
+      "slug": "demo-g12-wide-rear-derailleur", "brand": "velox-demo-works", "category": "derailleurs",
+      "name": "Demo G12 Wide-Range Rear Derailleur", "model": "G12-RD",
+      "weight_g": 298, "price_reference": 170, "currency": "EUR",
+      "specs": [["position", "Position", "Rear"], ["speeds", "Speeds", 12], ["clutch", "Clutch", "Yes"]],
+      "compatibility": { "speeds": 12, "max_cog": 44 }
+    },
+    {
+      "slug": "demo-r11-rear-derailleur", "brand": "velox-demo-works", "category": "derailleurs",
+      "name": "Demo R11 Rear Derailleur", "model": "R11-RD",
+      "weight_g": 230, "price_reference": 80, "currency": "EUR",
+      "specs": [["position", "Position", "Rear"], ["speeds", "Speeds", 11]],
+      "compatibility": { "speeds": 11, "max_cog": 30 }
+    },
+    {
+      "slug": "demo-r12-front-derailleur", "brand": "velox-demo-parts", "category": "derailleurs",
+      "name": "Demo R12 Front Derailleur (Braze-on)", "model": "R12-FD",
+      "weight_g": 96, "price_reference": 70, "currency": "EUR",
+      "specs": [["position", "Position", "Front"], ["speeds", "Speeds", 12]],
+      "compatibility": { "speeds": 12, "fd_mount": "braze_on" }
+    },
+    {
+      "slug": "demo-r11-front-derailleur-clamp", "brand": "velox-demo-works", "category": "derailleurs",
+      "name": "Demo R11 Front Derailleur (31.8 Clamp)", "model": "R11-FD",
+      "weight_g": 110, "price_reference": 40, "currency": "EUR",
+      "specs": [["position", "Position", "Front"], ["speeds", "Speeds", 11]],
+      "compatibility": { "speeds": 11, "fd_mount": "clamp_31_8" }
+    },
+    {
+      "slug": "demo-hydraulic-flat-mount-caliper", "brand": "velox-demo-parts", "category": "brakes",
+      "name": "Demo Hydraulic Flat-Mount Caliper", "model": "HD-FM",
+      "weight_g": 140, "price_reference": 95, "currency": "EUR",
+      "specs": [["actuation", "Actuation", "Hydraulic"], ["pistons", "Pistons", 2]],
+      "compatibility": { "brake_type": "disc", "brake_mount": "flat_mount" }
+    },
+    {
+      "slug": "demo-dual-pivot-rim-caliper", "brand": "velox-demo-works", "category": "brakes",
+      "name": "Demo Dual-Pivot Rim Caliper", "model": "RB-DP",
+      "weight_g": 175, "price_reference": 55, "currency": "EUR",
+      "specs": [["actuation", "Actuation", "Mechanical cable"]],
+      "compatibility": { "brake_type": "rim", "brake_mount": "rim_caliper" }
+    },
+    {
+      "slug": "demo-rotor-160-centerlock", "brand": "velox-demo-parts", "category": "brake-rotors",
+      "name": "Demo Rotor 160 mm Center Lock", "model": "RT-160CL",
+      "weight_g": 120, "price_reference": 40, "currency": "EUR",
+      "compatibility": { "rotor_diameter_mm": 160, "rotor_mount": "centerlock" }
+    },
+    {
+      "slug": "demo-rotor-140-centerlock", "brand": "velox-demo-parts", "category": "brake-rotors",
+      "name": "Demo Rotor 140 mm Center Lock", "model": "RT-140CL",
+      "weight_g": 100, "price_reference": 38, "currency": "EUR",
+      "compatibility": { "rotor_diameter_mm": 140, "rotor_mount": "centerlock" }
+    },
+    {
+      "slug": "demo-rotor-180-6bolt", "brand": "velox-demo-works", "category": "brake-rotors",
+      "name": "Demo Rotor 180 mm 6-Bolt", "model": "RT-1806B",
+      "weight_g": 160, "price_reference": 35, "currency": "EUR",
+      "compatibility": { "rotor_diameter_mm": 180, "rotor_mount": "six_bolt" }
+    },
+    {
+      "slug": "demo-alloy-disc-wheelset", "brand": "velox-demo-parts", "category": "wheelsets",
+      "name": "Demo Alloy Disc Wheelset", "model": "WH-A30D", "material": "Aluminium",
+      "weight_g": 1650, "price_reference": 480, "currency": "EUR",
+      "specs": [["rim_depth", "Rim depth", 30, "mm"], ["internal_width", "Internal width", 21, "mm"], ["tubeless", "Tubeless ready", "Yes"]],
+      "compatibility": { "wheel_size": "700c", "front_axle": "12x100_ta", "rear_axle": "12x142_ta", "brake_type": "disc", "rotor_mount": "centerlock", "freehub_bodies": ["shimano_hg"] }
+    },
+    {
+      "slug": "demo-carbon-45-disc-wheelset", "brand": "velox-demo-works", "category": "wheelsets",
+      "name": "Demo Carbon 45 Disc Wheelset (XDR)", "model": "WH-C45D", "material": "Carbon fibre",
+      "weight_g": 1420, "price_reference": 1350, "currency": "EUR",
+      "specs": [["rim_depth", "Rim depth", 45, "mm"], ["internal_width", "Internal width", 23, "mm"]],
+      "compatibility": { "wheel_size": "700c", "front_axle": "12x100_ta", "rear_axle": "12x142_ta", "brake_type": "disc", "rotor_mount": "centerlock", "freehub_bodies": ["sram_xdr"] }
+    },
+    {
+      "slug": "demo-alloy-rim-brake-wheelset", "brand": "velox-demo-works", "category": "wheelsets",
+      "name": "Demo Alloy Rim-Brake Wheelset", "model": "WH-A24R", "material": "Aluminium",
+      "weight_g": 1580, "price_reference": 320, "currency": "EUR",
+      "specs": [["rim_depth", "Rim depth", 24, "mm"], ["internal_width", "Internal width", 19, "mm"]],
+      "compatibility": { "wheel_size": "700c", "front_axle": "100_qr", "rear_axle": "130_qr", "brake_type": "rim", "freehub_bodies": ["shimano_hg"] }
+    },
+    {
+      "slug": "demo-road-tire-700x28", "brand": "velox-demo-parts", "category": "tires",
+      "name": "Demo Road Tire 700×28", "model": "TR-R28",
+      "weight_g": 260, "price_reference": 55, "currency": "EUR",
+      "specs": [["etrto", "ETRTO", "28-622"], ["casing", "Casing", "120 TPI"], ["tubeless", "Tubeless ready", "Yes"]],
+      "compatibility": { "wheel_size": "700c", "tire_width_mm": 28 }
+    },
+    {
+      "slug": "demo-road-tire-700x32", "brand": "velox-demo-parts", "category": "tires",
+      "name": "Demo All-Road Tire 700×32", "model": "TR-R32",
+      "weight_g": 310, "price_reference": 58, "currency": "EUR",
+      "specs": [["etrto", "ETRTO", "32-622"], ["tubeless", "Tubeless ready", "Yes"]],
+      "compatibility": { "wheel_size": "700c", "tire_width_mm": 32 }
+    },
+    {
+      "slug": "demo-gravel-tire-700x40", "brand": "velox-demo-works", "category": "tires",
+      "name": "Demo Gravel Tire 700×40", "model": "TR-G40",
+      "weight_g": 450, "price_reference": 52, "currency": "EUR",
+      "specs": [["etrto", "ETRTO", "40-622"], ["tread", "Tread", "File centre, knob shoulder"]],
+      "compatibility": { "wheel_size": "700c", "tire_width_mm": 40 }
+    },
+    {
+      "slug": "demo-gravel-tire-650bx47", "brand": "velox-demo-works", "category": "tires",
+      "name": "Demo Gravel Tire 650b×47", "model": "TR-G47B",
+      "weight_g": 520, "price_reference": 54, "currency": "EUR",
+      "specs": [["etrto", "ETRTO", "47-584"]],
+      "compatibility": { "wheel_size": "650b", "tire_width_mm": 47 }
+    },
+    {
+      "slug": "demo-butyl-tube-700", "brand": "velox-demo-parts", "category": "tubes",
+      "name": "Demo Butyl Tube 700×25–32", "model": "TB-700",
+      "weight_g": 100, "price_reference": 8, "currency": "EUR",
+      "specs": [["valve", "Valve", "Presta 60 mm"]],
+      "compatibility": { "wheel_size": "700c" }
+    },
+    {
+      "slug": "demo-alloy-drop-bar-420", "brand": "velox-demo-parts", "category": "handlebars",
+      "name": "Demo Alloy Drop Bar 420", "model": "HB-A420", "material": "Aluminium",
+      "weight_g": 285, "price_reference": 65, "currency": "EUR",
+      "specs": [["width", "Width (c-c)", 420, "mm"], ["reach", "Reach", 80, "mm"], ["drop", "Drop", 125, "mm"]],
+      "compatibility": { "clamp_mm": 31.8 }
+    },
+    {
+      "slug": "demo-carbon-drop-bar-400", "brand": "velox-demo-works", "category": "handlebars",
+      "name": "Demo Carbon Drop Bar 400", "model": "HB-C400", "material": "Carbon fibre",
+      "weight_g": 215, "price_reference": 210, "currency": "EUR",
+      "specs": [["width", "Width (c-c)", 400, "mm"], ["reach", "Reach", 75, "mm"]],
+      "compatibility": { "clamp_mm": 31.8 }
+    },
+    {
+      "slug": "demo-flared-gravel-bar-440", "brand": "velox-demo-works", "category": "handlebars",
+      "name": "Demo Flared Gravel Bar 440", "model": "HB-G440", "material": "Aluminium",
+      "weight_g": 320, "price_reference": 75, "currency": "EUR",
+      "specs": [["width", "Width at hoods (c-c)", 440, "mm"], ["flare", "Flare", 16, "°"]],
+      "compatibility": { "clamp_mm": 31.8 }
+    },
+    {
+      "slug": "demo-alloy-stem-100", "brand": "velox-demo-parts", "category": "stems",
+      "name": "Demo Alloy Stem 100 mm", "model": "ST-A100", "material": "Aluminium",
+      "weight_g": 125, "price_reference": 45, "currency": "EUR",
+      "specs": [["length", "Length", 100, "mm"], ["angle", "Angle", -6, "°"]],
+      "compatibility": { "steerer_clamp_mm": 28.6, "handlebar_clamp_mm": 31.8 }
+    },
+    {
+      "slug": "demo-alloy-stem-90-35", "brand": "velox-demo-works", "category": "stems",
+      "name": "Demo Alloy Stem 90 mm (35 mm clamp)", "model": "ST-A90-35", "material": "Aluminium",
+      "weight_g": 140, "price_reference": 55, "currency": "EUR",
+      "specs": [["length", "Length", 90, "mm"], ["angle", "Angle", -8, "°"]],
+      "compatibility": { "steerer_clamp_mm": 28.6, "handlebar_clamp_mm": 35 }
+    },
+    {
+      "slug": "demo-short-nose-saddle", "brand": "velox-demo-parts", "category": "saddles",
+      "name": "Demo Short-Nose Performance Saddle", "model": "SD-SN143",
+      "weight_g": 215, "price_reference": 120, "currency": "EUR",
+      "specs": [["width", "Width", 143, "mm"], ["rails", "Rails", "Alloy 7×7 mm"]]
+    },
+    {
+      "slug": "demo-classic-saddle", "brand": "velox-demo-works", "category": "saddles",
+      "name": "Demo Classic Padded Saddle", "model": "SD-CL150",
+      "weight_g": 290, "price_reference": 60, "currency": "EUR",
+      "specs": [["width", "Width", 150, "mm"]]
+    },
+    {
+      "slug": "demo-carbon-seatpost-27-2", "brand": "velox-demo-parts", "category": "seatposts",
+      "name": "Demo Carbon Seatpost 27.2", "model": "SP-C272", "material": "Carbon fibre",
+      "weight_g": 190, "price_reference": 140, "currency": "EUR",
+      "specs": [["length", "Length", 350, "mm"], ["setback", "Setback", 15, "mm"]],
+      "compatibility": { "seatpost_diameter_mm": 27.2 }
+    },
+    {
+      "slug": "demo-alloy-seatpost-31-6", "brand": "velox-demo-works", "category": "seatposts",
+      "name": "Demo Alloy Seatpost 31.6", "model": "SP-A316", "material": "Aluminium",
+      "weight_g": 260, "price_reference": 40, "currency": "EUR",
+      "specs": [["length", "Length", 350, "mm"]],
+      "compatibility": { "seatpost_diameter_mm": 31.6 }
+    },
+    {
+      "slug": "demo-road-clipless-pedals", "brand": "velox-demo-parts", "category": "pedals",
+      "name": "Demo Road Clipless Pedals", "model": "PD-R3",
+      "weight_g": 248, "price_reference": 110, "currency": "EUR",
+      "specs": [["system", "Cleat system", "3-bolt"]]
+    },
+    {
+      "slug": "demo-flat-pedals", "brand": "velox-demo-works", "category": "pedals",
+      "name": "Demo Composite Flat Pedals", "model": "PD-F1",
+      "weight_g": 330, "price_reference": 35, "currency": "EUR"
+    },
+    {
+      "slug": "demo-bar-tape", "brand": "velox-demo-parts", "category": "bar-tape",
+      "name": "Demo Grip Bar Tape 2.5 mm", "model": "BT-25",
+      "weight_g": 60, "price_reference": 25, "currency": "EUR"
+    },
+    {
+      "slug": "demo-alloy-bottle-cage", "brand": "velox-demo-parts", "category": "accessories",
+      "name": "Demo Alloy Bottle Cage", "model": "AC-BC1",
+      "weight_g": 35, "price_reference": 15, "currency": "EUR"
+    },
+    {
+      "slug": "demo-computer-mount", "brand": "velox-demo-works", "category": "accessories",
+      "name": "Demo Out-Front Computer Mount", "model": "AC-CM1",
+      "weight_g": 40, "price_reference": 30, "currency": "EUR",
+      "compatibility": { "clamp_mm": 31.8 }
+    }
+  ]
+}
