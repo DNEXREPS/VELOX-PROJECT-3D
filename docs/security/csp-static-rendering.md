@@ -1,7 +1,8 @@
-# Nonce-based CSP and static rendering: investigation and proposed fix
+# Nonce-based CSP and static rendering: investigation and fix
 
-Status: **proposal only.** Nothing in this document has been applied to PR #1 or its branch.
-The change below touches PR #1 code (`src/lib/supabase/server.ts`). It waits for explicit approval.
+**Status: implemented on PR #1** (branch `claude/velox-digital-garage-qnqdsm`, commit `29c11a1`), approved by the project owner.
+- PR #1 is not merged.
+- The investigation below is kept as written. The implementation and its evidence follow in "Implementation and results".
 
 ## Summary
 
@@ -84,7 +85,7 @@ Static rendering is only safe for these with a CSP that does not depend on a non
 | C | Separate non-nonce CSP for an explicit allowlist of static routes, using hashes or SRI | Allows static, CDN-cached catalogue pages | Later (catalogue SEO work); needs a spike |
 | D | Per-route `connection()` on the ten affected pages | Same result as (a), but ten edits that must be maintained | Inferior to (a) |
 
-### Exact proposed change (a): PR #1 code, not applied
+### Exact proposed change (a): PR #1 code (applied in `29c11a1`, see below)
 
 ```diff
 --- a/src/lib/supabase/server.ts
@@ -150,3 +151,51 @@ The guard alone would fail CI immediately, by design.
 1. Approve (a) plus the guard as a small follow-up commit on PR #1's branch, or a separate PR on top of it.
    - Tests: security E2E (CSP on public and private pages), the journey, and the no-env browser check above.
 2. Keep option C for the catalogue SEO work. Spike it before any catalogue page is made static.
+
+## Implementation and results (PR #1, commit `29c11a1`)
+
+### Changes
+
+| File | Change |
+|---|---|
+| `src/lib/supabase/server.ts` | `await cookies()` moved before the Supabase configuration check (option (a)), with a comment linking here |
+| `scripts/check-static-routes.mjs` | The guard proposed above, now committed. It fails when any HTML route in `.next/prerender-manifest.json` is prerendered and is not allowlisted (the allowlist is empty) |
+| `package.json` | `npm run check:static-routes` |
+| `.github/workflows/ci.yml` | The guard runs after the **unconfigured** build (quality job) and after the **configured** build (Supabase E2E job) |
+
+**Unchanged:**
+- The CSP itself: no `'unsafe-eval'` and no `'unsafe-inline'` for scripts; `'wasm-unsafe-eval'` as before.
+- KTX2 stays disabled.
+- The proxy, the headers, auth and RLS.
+
+**Route count.** The proposal said "31 routes". That count came from the P1 branch, which adds `/lab/assembly`. PR #1 has **30** routes.
+
+### Rendering, before and after (local production builds on the PR #1 branch, Chromium)
+
+| Build | Static routes | Dynamic routes | Guard | CSP violations (14 pages incl. 404) | Pages hydrated |
+|---|---|---|---|---|---|
+| No Supabase env, before fix (`039875d`) | 10 | 20 | **fails** (exit 1, lists the 10 routes) | **202** | 4 of 14 |
+| No Supabase env, after fix | 0 | 30 | passes | **0** | 14 of 14 |
+| Supabase env configured, after fix | 0 | 30 | passes | **0** | 14 of 14 |
+
+**Pages checked:**
+- `/`, `/register`, `/login`, `/forgot-password`, `/reset-password`
+- `/explore`, `/components`, `/community`
+- `/dashboard`, `/garage`, `/garage/new`, `/settings`, `/moderation`
+- an unknown path (404)
+
+**Before the fix**, the static pages were served with `s-maxage=31536000` and `x-nextjs-cache: HIT`. **After the fix**, every page is served `private, no-cache, no-store`, the same as configured production already was.
+
+The configured local check ran without a Supabase server. `/explore`, `/components` and `/community` therefore answered 500, because their data queries failed; they still showed no CSP violations. Auth and data were verified in CI against a real local Supabase stack (below).
+
+### CI (PR #1 branch, `29c11a1`)
+
+| Run | Event | Result |
+|---|---|---|
+| 44624000883 | push | **pass**: quality (typecheck, lint, 134 unit tests, unconfigured build, **static-route guard**), migrations + RLS (Postgres 16), real Supabase stack (RLS and hardening, configured build + guard, 16-step journey, security E2E incl. CSP on public/private pages and the studio, stored-XSS simulation) |
+| 44624012099 | pull_request (PR #1) | **pass**: same jobs |
+
+### Remaining limitations
+
+- **Unknown future pages.** A page that needs request data only through some other path is still caught by the guard. The fix itself only covers pages that consult the session.
+- **Option C (hash/SRI policy for static SEO pages)** is still future work for the catalogue. A static page will need an explicit allowlist entry plus its own policy, and the guard enforces that.

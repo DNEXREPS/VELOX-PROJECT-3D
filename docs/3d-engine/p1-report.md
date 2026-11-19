@@ -31,6 +31,100 @@ The resolver compared the stem's steerer clamp (28.6) with the frame's **headset
 - **Recorded data only:** clamp standards are compared only when both sides are recorded data.
 - **Result:** the real mismatch (35 mm stem with a 31.8 mm bar) is still reported, and a test covers it.
 
+## MTB hardtail demo expansion (follow-up, approved)
+
+**Scope.** These parts close the gap noted under Limitations: the demo catalogue previously had no MTB parts.
+- All entries are **fictional demo data** (`verification_status = 'demo'`), labelled as such, under the existing demo brands.
+- No schema change and no migration; the seed is regenerated.
+- The lab hardtail preset now uses these seeded parts, and the lab-only stand-ins are removed.
+
+### Components added (18; 11 of the seven requested types, 7 supporting)
+
+| Slot | Demo component | Recorded dimensions | 3D representation |
+|---|---|---|---|
+| Fork | Demo Rigid MTB Fork 470 | A2C 470, offset 44, 15×110 Boost, tapered, 28.6 steerer, post mount, ≤203 rotor | Representative asset `fork-mtb-rigid-demo`, built to the recorded A2C/offset |
+| Fork | Demo Rigid MTB Fork 480 (51 mm offset) | A2C 480, offset 51, rest as above | Representative asset `fork-demo-mtb-480` (**new**, manifest `1b0d0e51693e`), built to the recorded A2C/offset |
+| Fork | Demo Rigid MTB Fork (geometry not recorded) | interfaces only, no A2C/offset | **None**: deliberately unlinked; front wheel, tire and rotor become "mount point unavailable" |
+| Handlebar | Demo Alloy Riser Bar 780 | width 780, rise 20, backsweep 9°, clamp 35 | Generated (flat) |
+| Handlebar | Demo Carbon Flat Bar 760 | width 760, clamp 35 (rise/backsweep **not recorded**) | Generated (flat); "Rise/Backsweep not recorded — 0 shown" listed |
+| Handlebar | Demo Alloy Riser Bar (width not recorded) | rise 30, clamp 35 | **None**: "needs verification: width" |
+| Stem | Demo Alloy MTB Stem 50 mm | 50 mm, 0°, 28.6 steerer, 35 bar clamp | Generated |
+| Stem | Demo Alloy MTB Stem 70 mm (+6°) | 70 mm, +6°, 28.6 / 35 | Generated |
+| Crankset | Demo M12 Crankset 170 mm, 32T | 170 mm, 32T, 12-speed, BSA 73 | Generated |
+| Crankset | Demo M12 Crankset 175 mm, 30T | 175 mm, 30T, 12-speed, BSA 73 | Generated |
+| Cassette | Demo M12 Cassette 10–51 (Micro Spline) | 12 cogs, Micro Spline | Generated |
+| Cassette | Demo X12 Cassette 10–52 (XD) | 12 cogs, XD | Generated |
+| Chain | Demo M12 Chain | 12-speed (links 126) | Generated (path from the actual ring and cog) |
+| Rotor | Demo Rotor 203 mm 6-Bolt | 203 mm, 6-bolt | Generated (the existing 180 mm 6-bolt and 160 Center Lock rotors are also used) |
+| *supporting* Frame | Demo Trail Hardtail Alloy Frame | BSA 73, 12×148 Boost, post mount ≤180, 31.6 post, tapered, 29"/700c ≤61 mm tires; **no geometry chart** | Representative asset `frame-hardtail-demo` (`matchesRecordedGeometry: false`) |
+| *supporting* Wheelset | Demo 29" Trail Wheelset | 622 BSD, 15×110 / 12×148 Boost, 6-bolt, Micro Spline + XD, rim 22 / 30 internal | Generated |
+| *supporting* Tires | Demo Trail Tire 29×2.4 (61-622), Demo XC Tire 29×2.2 (56-622) | ETRTO | Generated (height modelled from width, listed) |
+
+**Vocabulary.** The attribute vocabulary gained two labels: `15x110_ta` (15×110 Boost) and `bsa_73` (BSA 73 mm). Unknown identifiers were already accepted; the labels only affect how they display.
+
+### Attachment and compatibility rules exercised
+
+The attachment rules are the existing velox-assembly/1 rules; nothing in the engine changed for MTB.
+
+**Mounting:**
+- fork `crown_race` → frame `head_lower` (both ZS44/EC49);
+- wheels → fork `front_axle` / frame `rear_axle`, with hub spacing taken from the recorded axle standard (110 / 148);
+- stem → `head_upper`;
+- bar → stem `bar_clamp`, rolled level;
+- crank → `bb`;
+- cassette → rear wheel `freehub`;
+- rotors → the disc hub's `rotor` anchor;
+- chain laid between the actual largest ring and smallest cog.
+
+**Compatibility rules evaluated on the full MTB build:** bb-shell, rear/front axle, freehub, rotor mount, front/rear rotor size, headset, stem-steerer, bar-clamp, cassette/crank–chain speed, seatpost diameter. **All pass.**
+
+### Real mismatches that are reported, not hidden
+
+| Change | Compatibility engine | 3D resolver |
+|---|---|---|
+| Road stem (31.8 mm clamp) with the 35 mm MTB bar | `bar-clamp` incompatible | `interface_mismatch:bar_clamp: part 35 ≠ host 31.8` |
+| Road HG cassette on the Micro Spline / XD wheelset | `freehub` incompatible | geometry shown, flagged in the panel |
+| 11-speed chain on the 12-speed drivetrain | cassette and crank speed rules incompatible | geometry shown |
+| 203 mm rear rotor (frame max 180) | `rear-rotor-size` incompatible | geometry shown |
+| Center Lock rotor on the 6-bolt hub | `rotor-mount` incompatible | geometry shown |
+
+### Geometry and measurement limitations (MTB)
+
+**Representative geometry:**
+- The hardtail frame is representative and has no recorded geometry chart, so BB height, wheelbase, bar/saddle positions and pedal height are **estimates**.
+- The forks are representative models, built to their recorded axle-to-crown and offset.
+
+**Rigid forks only.**
+- Suspension forks, sag and travel are not modelled; the joint model reserves them for later.
+- The forks' axle-to-crown values are "suspension-corrected" demo values.
+
+**Display choices.** The stem height, seatpost insertion, chainline, crank arm pose and chain position are display assumptions, listed in the UI. The chain always sits on the smallest cog. A cassette swap with the same 10T smallest cog therefore leaves the chain path unchanged; that is correct, not a missed update.
+
+### Replacement scenarios tested
+
+**Unit tests (`tests/unit/assembly-p1.test.ts`):**
+- fork 470→480, which moves the front wheel, tire and rotor and grows the wheelbase; the 2D fork line ends at the new axle;
+- the fork without recorded geometry;
+- bar 780→760, with unrecorded values listed and the bar still level;
+- the bar without a width;
+- stem 50→70/+6°, which puts the bar clamp at exactly 70 mm;
+- crank 170/32→175/30, with the pedal exactly 5 mm lower and the chain on the 30T ring;
+- cassette Micro Spline→XD;
+- chain 12→11-speed;
+- rotor 180→203, and the Center Lock mismatch;
+- revision refs change for exactly the replaced (and dependent) slots;
+- the road build is unchanged.
+
+**Studio E2E:**
+- the full MTB build is applied with the rider's own token;
+- the UI picker replaces fork, bar, stem, crankset, cassette, chain and rotor, checking geometry, pixels, dependants and measurements;
+- 2D fork, and before/after;
+- the 31.8/35 clamp mismatch;
+- save + reload as revision 2;
+- Classic fallback and back.
+
+**Lab E2E:** the second MTB fork asset (decode, integrity, fingerprint, swap).
+
 ## Tests
 
 ### Local results (this container, Linux)
@@ -39,11 +133,11 @@ The resolver compared the stem's steerer clamp (28.6) with the frame's **headset
 |---|---|
 | Typecheck (`tsc --noEmit`) | pass |
 | Lint (`eslint`) | pass, 0 warnings |
-| Unit (`vitest tests/unit`) | **190 / 190** (P1 adds 30 in `assembly-p1.test.ts`) |
-| Database (shim + all migrations + seed, Postgres 16) | **48 / 48**; seed unchanged |
+| Unit (`vitest tests/unit`) | **206 / 206** after the MTB expansion (was 190; the MTB tests add 16) |
+| Database (shim + all migrations + seed, Postgres 16) | **48 / 48** with the regenerated seed (71 demo components); seed and assets reproduce byte-for-byte |
 | Asset pipeline reproducibility (re-author + re-run + diff) | byte-identical |
 | Production build (configured, with engine flag) | pass |
-| Lab E2E, Chromium (production renderer) | **12 / 12** |
+| Lab E2E, Chromium (production renderer) | **13 / 13** after the MTB expansion (adds the second MTB fork asset) |
 
 ### Not runnable here
 
@@ -129,10 +223,7 @@ Other notes:
   - The gravel fork lacks axle-to-crown, and the steel rim-brake fork has no data, so both show "No 3D model". Gravel and steel frames are unlinked.
   - The carbon drop bar lacks drop, and the flared bar lacks reach and drop, so both show "needs verification".
   - The rim-brake wheelset has no rotor mount, so its rotors are unavailable.
-- **No MTB parts in the demo catalogue:**
-  - The hardtail path is covered by the lab (clearly labelled, lab-only parts) and by unit tests.
-  - In the studio, a mountain bike shows the modular viewer with explicit empty and unavailable states.
-  - Adding MTB demo parts to the seed is a question still open for you.
+- **MTB demo parts:** added (see "MTB hardtail demo expansion"). They are fictional demo data, and suspension is not modelled.
 - **Not modelled in P1:** saddle, pedals, derailleurs, brakes/calipers, grips/tape, headset spacers.
   - These slots are listed as not modelled and are never drawn with borrowed geometry.
 - **Display assumptions** (all labelled in the UI):
