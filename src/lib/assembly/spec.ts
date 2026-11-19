@@ -157,11 +157,20 @@ export interface AssetManifest {
 /* Resolver input / output                                                              */
 /* ------------------------------------------------------------------------------------ */
 
-export type GeneratorId = "wheel" | "tire";
+export type GeneratorId = "wheel" | "tire" | "stem" | "handlebar" | "seatpost" | "crankset" | "cassette" | "chain" | "rotor";
+
+/** Generator parameters: numbers or number lists (e.g. cog teeth). Derived only from recorded data + listed assumptions. */
+export type GeneratorParams = Record<string, number | number[]>;
 
 export type VisualBinding =
-  | { kind: "asset"; key: string; version: number }
-  | { kind: "generator"; generator: GeneratorId; version: number };
+  /**
+   * matchesRecordedGeometry: true when the authored asset was built to this component's
+   * RECORDED dimensions (verified by the pipeline). false = representative shape only:
+   * measurements derived from it are estimates.
+   */
+  | { kind: "asset"; key: string; version: number; matchesRecordedGeometry?: boolean }
+  /** variant: shape family (e.g. handlebar "drop" | "flat"); dimensions still come from data. */
+  | { kind: "generator"; generator: GeneratorId; version: number; variant?: string };
 
 /** One installed (or pending) component, as the resolver sees it. */
 export interface PartInput {
@@ -203,7 +212,7 @@ export type NodeStatus =
 
 export type VisualSourceRef =
   | { kind: "asset"; key: string; version: number; sha256: string; file: string }
-  | { kind: "generator"; generator: GeneratorId; version: number; params: Record<string, number>; assumptions: string[] };
+  | { kind: "generator"; generator: GeneratorId; version: number; variant?: string; params: GeneratorParams; assumptions: string[] };
 
 export interface AssemblyNode {
   /** Stable id used by the renderer to reconcile (e.g. "frame", "wheel_front", "tire_rear"). */
@@ -228,7 +237,7 @@ export interface AssemblyNode {
 /** What a build revision stores per slot to reproduce the geometry exactly (P3 migration). */
 export type RevisionVisualRef =
   | { representation: "exact" | "representative"; asset: { key: string; version: number; sha256: string } }
-  | { representation: "generated"; generator: { id: GeneratorId; version: number; params: Record<string, number>; paramsHash: string } }
+  | { representation: "generated"; generator: { id: GeneratorId; version: number; variant?: string; params: GeneratorParams; paramsHash: string } }
   | { representation: "none"; reason: NodeStatus };
 
 export interface AssemblySpec {
@@ -241,7 +250,21 @@ export interface AssemblySpec {
     pitchDeg: number | null;
     bbHeightMm: number | null;
     wheelbaseMm: number | null;
+    /** Handlebar clamp centre relative to the BB (world, mm): x forward, y up. */
+    barClampMm: { x: number; y: number } | null;
+    /** Seatpost (saddle) clamp centre relative to the BB (world, mm). */
+    saddleClampMm: { x: number; y: number } | null;
+    /** Height of the lowest pedal spindle above the ground with the crank vertical (mm). */
+    lowestPedalMm: number | null;
   };
+  /**
+   * Quality of each derived value. "recorded" = computed only from recorded dimensions;
+   * "estimate" = at least one input is representative geometry or a modelling assumption
+   * (notes say which); "unavailable" = cannot be computed.
+   */
+  derivedQuality: Record<string, { quality: "recorded" | "estimate" | "unavailable"; notes: string[] }>;
+  /** Installed slots that have no geometry in this engine version (data-only). */
+  notModelled: BikeSlot[];
   warnings: string[];
   /** Per-slot references for build revisions. */
   revision: Partial<Record<BikeSlot, RevisionVisualRef>>;

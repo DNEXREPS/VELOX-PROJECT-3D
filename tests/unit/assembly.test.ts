@@ -1,6 +1,6 @@
 /**
  * velox-assembly/1 — resolver, attachment maths, generators, 2D projection, revision refs.
- * Uses the real pipeline manifest (public/lab-assets) of the P0 prototype assets.
+ * Uses the real pipeline manifest (public/model-assets) of the P0 prototype assets.
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -10,12 +10,12 @@ import { resolveAssembly } from "@/lib/assembly/resolve";
 import { attachPose, checkInterfacePose, distance, interfaceFrame, multiply, rotationDeltaDeg, transformPoint } from "@/lib/assembly/math";
 import { buildTire, buildWheel, resolveTire, resolveWheel, TIRE_HEIGHT_RATIO } from "@/lib/assembly/generators";
 import { geometryFingerprint, hash64 } from "@/lib/assembly/fingerprint";
-import { projectSide, projectionRadii } from "@/lib/assembly/projection2d";
+import { projectSide } from "@/lib/assembly/projection2d";
 import { CATEGORY_PROFILES, FRAME_TEMPLATES, TOLERANCE } from "@/lib/assembly/conventions";
 import { validateAsset, type MeasuredFile } from "@/lib/assembly/validate";
 import type { AssemblyInput, AssemblySpec, AssetManifest, CategoryTarget, PartInput } from "@/lib/assembly/spec";
 
-const manifest = JSON.parse(readFileSync(join(__dirname, "../../public/lab-assets/manifest.json"), "utf8")) as AssetManifest;
+const manifest = JSON.parse(readFileSync(join(__dirname, "../../public/model-assets/manifest.json"), "utf8")) as AssetManifest;
 const asset = (key: string): PartInput["visual"] => ({ kind: "asset", key, version: 1 });
 
 function build(o: { category?: CategoryTarget; frame?: string | null; fork?: string | null; wheel?: string | null; front?: number | null; rear?: number | null } = {}): AssemblyInput {
@@ -183,9 +183,9 @@ describe("one description for 3D, 2D and history", () => {
   it("the 2D projection is derived from the same spec and changes with a replacement", () => {
     const a = resolveAssembly(build(), manifest);
     const b = resolveAssembly(build({ fork: "fork-gravel-demo" }), manifest);
-    const front = (s: AssemblySpec) => projectSide(s, projectionRadii(s)).find((p) => p.kind === "circle" && p.nodeId === "tire_front") as { cx: number; cy: number };
+    const front = (s: AssemblySpec) => projectSide(s).find((p) => p.kind === "circle" && p.nodeId === "tire_front") as { cx: number; cy: number };
     expect(front(b).cx).not.toBeCloseTo(front(a).cx, 3);
-    const missing = projectSide(resolveAssembly(build({ front: null }), manifest), {}).filter((p) => p.kind === "missing");
+    const missing = projectSide(resolveAssembly(build({ front: null }), manifest)).filter((p) => p.kind === "missing");
     expect(missing).toEqual([expect.objectContaining({ nodeId: "tire_front", reason: "missing_dimensions" })]);
   });
 
