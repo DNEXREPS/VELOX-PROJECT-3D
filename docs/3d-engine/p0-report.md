@@ -63,7 +63,11 @@ The architectural requirements map to the specification as follows:
    - Found because the macOS CI build has no backend. The lab now calls `connection()`.
    - **Recommendation for PR #1 / P1:** make request-time rendering explicit in the root layout. Production has the variables (`env:check` enforces them), but a misconfigured preview would ship a broken page.
 7. **Fingerprint hash bug** (found and fixed in P0): one hash lane went negative and printed a `-`. All fingerprints were regenerated.
-8. **Hosting.**
+8. **WebKit start-up stall.** In WebKit (Playwright WebKit 26.6, macOS CI), the no-WebAssembly CSP mode and the KTX2 opt-in stalled: a decoder start-up promise never settled. Chromium was unaffected.
+   - Every decoder start-up step now has a timeout with fallback: meshopt import, meshopt WebAssembly start-up, the WebAssembly probe and the KTX2 transcode.
+   - After that, WebKit passed all modes and fell back to the JavaScript decoder with identical geometry.
+   - **Rule for P1:** no 3D decoder or loader promise may be awaited without a timeout.
+9. **Hosting.**
    - Local Supabase public bucket: anonymous listing returns `[]`; anonymous upload is denied by RLS.
    - Public objects are served with `cache-control: max-age=31536000` and `Access-Control-Allow-Origin: *`. Storage does not add `immutable`; content-hashed paths make that safe.
    - Re-publishing uploads only the manifest pointer.
@@ -93,7 +97,7 @@ The hardtail's −2.7° pitch is a genuine geometric effect, and the tests asser
 | Security E2E (CSP check made token-level) | 16 / 16 | pass |
 | Lab E2E, Chromium, static + Supabase source | **11 / 11** | run in the Supabase job |
 | Lab E2E, Chromium, no-backend build (macOS-equivalent) | 10 / 10 | — |
-| Lab E2E, WebKit desktop / iPhone 15 / iPad Pro 11 emulation | not runnable here (no WebKit in this container) | macOS job: see the final summary for its result |
+| Lab E2E, WebKit 26.6 desktop / iPhone 15 / iPad Pro 11 emulation | not runnable here (no WebKit in this container) | **10 / 10** on each (macOS job) |
 
 **Lab E2E coverage:**
 - assembly of independently authored parts
