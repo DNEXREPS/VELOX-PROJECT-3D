@@ -55,6 +55,16 @@ async function openLab(query = "", setup, { waitSettle = true } = {}) {
 
 /** Wait until every resolvable node is rendered with its current source and nothing is loading. */
 async function settle(page, timeout = 30000) {
+  try {
+    await waitSettled(page, timeout);
+  } catch (e) {
+    // Diagnostics for CI: which node / decoder step did not finish.
+    const s = await page.evaluate(() => window.__veloxLab && { nodes: window.__veloxLab.nodes.map((n) => `${n.id}:${n.status}:${n.sig ? "sig" : "-"}`), rendered: window.__veloxLab.render?.rendered, pending: window.__veloxLab.render?.pending, errors: window.__veloxLab.render?.errors, report: window.__veloxLab.render?.report, csp: window.__veloxLab.cspViolations }).catch(() => null);
+    console.log("  settle diagnostics:", JSON.stringify(s));
+    throw e;
+  }
+}
+async function waitSettled(page, timeout) {
   await page.waitForFunction(
     () => {
       const s = window.__veloxLab;

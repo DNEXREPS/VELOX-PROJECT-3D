@@ -30,6 +30,11 @@ export interface LoaderReport {
 
 export class IntegrityError extends Error {}
 
+/** Decoder start-up must never hang the scene (P0: WebKit stalled under some CSP modes). */
+function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  return Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${what} timed out after ${ms} ms`)), ms))]);
+}
+
 async function sha256Hex(buf: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", buf);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -105,8 +110,8 @@ export class AssetLoader {
     // (CSP without 'wasm-unsafe-eval', e.g. older Safari) or missing.
     try {
       if (typeof WebAssembly !== "object") throw new Error("WebAssembly not available");
-      const { MeshoptDecoder } = await import("three/examples/jsm/libs/meshopt_decoder.module.js");
-      await MeshoptDecoder.ready;
+      const { MeshoptDecoder } = await withTimeout(import("three/examples/jsm/libs/meshopt_decoder.module.js"), 5000, "meshopt decoder import");
+      await withTimeout(MeshoptDecoder.ready, 3000, "meshopt WebAssembly start-up");
       this.gltf.setMeshoptDecoder(MeshoptDecoder);
       this.report.decoder = "wasm";
     } catch (e) {
@@ -123,7 +128,7 @@ export class AssetLoader {
     }
     try {
       if (typeof WebAssembly !== "object") throw new Error("WebAssembly not available");
-      await WebAssembly.compile(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
+      await withTimeout(WebAssembly.compile(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0])), 2000, "WebAssembly probe");
       this.ktx2 = new KTX2Loader().setTranscoderPath("/vendor/basis/").detectSupport(renderer);
       this.report.ktx2 = "supported";
     } catch (e) {
@@ -141,10 +146,11 @@ export class AssetLoader {
         this.report.integrityChecks++;
         // Parse the verified bytes directly (no blob: URL fetch, which connect-src forbids).
         // The transcoder worker can fail without settling (e.g. CSP blocks its code); time out.
-        const tex = await Promise.race([
+        const tex = await withTimeout(
           new Promise<THREE.CompressedTexture>((resolve, reject) => this.ktx2!.parse(buf, resolve as (t: THREE.CompressedTexture) => void, reject)),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("KTX2 transcode timed out")), 4000)),
-        ]);
+          4000,
+          "KTX2 transcode",
+        );
         this.report.textures[id] = "ktx2";
         return tex;
       } catch (e) {
@@ -154,7 +160,8 @@ export class AssetLoader {
     }
     const buf = await fetchVerified(this.baseUrl + t.fallback.file, t.fallback.sha256);
     this.report.integrityChecks++;
-    const bitmap = await createImageBitmap(new Blob([buf], { type: t.fallback.mime }), { imageOrientation: "flipY" });
+    const blob = new Blob([buf], { type: t.fallback.mime });
+    const bitmap = await createImageBitmap(blob, { imageOrientation: "flipY" }).catch(() => createImageBitmap(blob));
     const tex = new THREE.Texture(bitmap as unknown as HTMLImageElement);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.needsUpdate = true;
