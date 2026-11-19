@@ -25,7 +25,7 @@ describe("published asset set", () => {
   it("the manifest pointer equals an immutable, content-addressed manifest file", () => {
     const immutable = readFileSync(join(LAB, `manifest-${sha(pointer).slice(0, 12)}.json`));
     expect(sha(immutable)).toBe(sha(pointer));
-    expect(manifest.assets.map((a) => a.key).sort()).toEqual(["fork-demo-carbon-disc", "fork-gravel-demo", "fork-mtb-rigid-demo", "fork-road-demo", "frame-hardtail-demo", "frame-road-demo"]);
+    expect(manifest.assets.map((a) => a.key).sort()).toEqual(["fork-demo-carbon-disc", "fork-demo-mtb-480", "fork-gravel-demo", "fork-mtb-rigid-demo", "fork-road-demo", "frame-hardtail-demo", "frame-road-demo"]);
   });
 
   it("every file is content-hashed and matches its SHA-256", () => {

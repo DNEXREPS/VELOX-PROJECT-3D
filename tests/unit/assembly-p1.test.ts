@@ -18,6 +18,7 @@ import { LAB_PRESETS, labInput, type LabConfig } from "@/features/lab/lab-config
 import { LAB_PARTS } from "@/features/lab/lab-parts";
 import { DEMO_VISUAL_LINKS, engineTarget, parseEtrto, recordedDims, toPartInput } from "@/features/studio/assembly/demo-bindings";
 import type { BikeSlot } from "@/lib/domain/slots";
+import { checkConfiguration, type CheckResult } from "@/lib/compatibility";
 
 const manifest = JSON.parse(readFileSync(join(__dirname, "../../public/model-assets/manifest.json"), "utf8")) as AssetManifest;
 const resolve = (c: LabConfig) => resolveAssembly(labInput(c), manifest);
@@ -80,8 +81,8 @@ describe("full builds from the demo links", () => {
 
 describe("replacements change the right geometry and measurements", () => {
   it("crank length 170 → 175 lowers the pedal by exactly 5 mm and changes nothing else", () => {
-    const a = resolve(swap(LAB_PRESETS.hardtail, { crankset: "lab-crank-170-32" }));
-    const b = resolve(swap(LAB_PRESETS.hardtail, { crankset: "lab-crank-175-32" }));
+    const a = resolve(swap(LAB_PRESETS.hardtail, { crankset: "demo-m12-crankset-170-32" }));
+    const b = resolve(swap(LAB_PRESETS.hardtail, { crankset: "demo-m12-crankset-175-30" }));
     expect(a.derived.lowestPedalMm! - b.derived.lowestPedalMm!).toBeCloseTo(5, 6);
     expect(b.derived.bbHeightMm).toBe(a.derived.bbHeightMm);
     expect(b.derived.wheelbaseMm).toBe(a.derived.wheelbaseMm);
@@ -196,7 +197,7 @@ describe("missing data is explicit — nothing is guessed or borrowed", () => {
   });
 
   it("unlinked catalog components have no 3D representation (no substitution)", () => {
-    const s = resolve(swap(LAB_PRESETS.road, { fork: "demo-steel-gravel-fork" in LAB_PARTS ? "demo-steel-gravel-fork" : Object.keys(LAB_PARTS).find((k) => LAB_PARTS[k].slot === "fork" && !DEMO_VISUAL_LINKS[k] && !LAB_PARTS[k].binding)! }));
+    const s = resolve(swap(LAB_PRESETS.road, { fork: "demo-steel-rim-fork" }));
     const fork = node(s, "fork");
     expect(fork.status).toBe("no_visual");
     expect(fork.representation).toBe("none");
@@ -226,7 +227,7 @@ describe("2D side view comes from the same spec as 3D", () => {
   });
 
   it("replacements change the 2D view the same way (crank length)", () => {
-    const b = resolve(swap(LAB_PRESETS.hardtail, { crankset: "lab-crank-175-32" }));
+    const b = resolve(swap(LAB_PRESETS.hardtail, { crankset: "demo-m12-crankset-175-30" }));
     const arm = (s: AssemblySpec) => {
       const p = projectSide(s).find((x) => x.nodeId === "crankset" && x.kind === "polyline") as { points: [number, number][] };
       return Math.hypot(p.points[1][0] - p.points[0][0], p.points[1][1] - p.points[0][1]) / 2;
@@ -312,5 +313,174 @@ describe("revision references", () => {
     const s = resolve(swap(LAB_PRESETS.road, { stem: "demo-alloy-stem-90-35" }));
     expect(gen(s.revision.stem)?.paramsHash).not.toBe(gen(road.revision.stem)?.paramsHash);
     expect(s.revision.crankset).toEqual(road.revision.crankset);
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// MTB hardtail demo (catalogue parts, P1 MTB expansion)
+// ---------------------------------------------------------------------------------------
+const compat = (c: LabConfig): CheckResult[] =>
+  checkConfiguration(
+    Object.entries(c.parts)
+      .filter(([, k]) => k && LAB_PARTS[k])
+      .map(([slot, k]) => ({ slot: slot as BikeSlot, name: LAB_PARTS[k!].part.name, attributes: LAB_PARTS[k!].part.attributes })),
+  );
+const incompatible = (c: LabConfig) => compat(c).filter((r) => r.status === "incompatible").map((r) => r.ruleId).sort();
+const MTB = LAB_PRESETS.hardtail;
+const params = (s: AssemblySpec, id: string) => (node(s, id).source as unknown as { params: Record<string, number | number[]> }).params;
+
+describe("MTB hardtail demo build", () => {
+  it("is made only of seeded demo catalogue parts (no lab-only parts)", () => {
+    for (const key of Object.values(MTB.parts)) {
+      const lp = LAB_PARTS[key!];
+      expect(lp, key!).toBeDefined();
+      expect(lp.part.componentSlug).toBe(key!.replace(/#rear$/, ""));
+    }
+  });
+
+  it("is fully compatible according to the compatibility engine", () => {
+    expect(incompatible(MTB)).toEqual([]);
+    const ids = new Set(compat(MTB).map((r) => r.ruleId));
+    for (const id of ["bb-shell", "rear-axle", "front-axle", "freehub", "rotor-mount", "front-rotor-size", "rear-rotor-size", "headset-standard", "stem-steerer", "bar-clamp", "speed-cassette-chain", "speed-crank-chain", "seatpost-diameter"]) expect(ids, id).toContain(id);
+  });
+
+  it("frame and forks: representative models; fork geometry built to the recorded axle-to-crown/offset", () => {
+    expect(node(hardtail, "frame").representation).toBe("representative");
+    expect(DEMO_VISUAL_LINKS["demo-trail-hardtail-alloy-frame"]).toMatchObject({ kind: "asset", matchesRecordedGeometry: false });
+    expect(DEMO_VISUAL_LINKS["demo-rigid-mtb-fork-470"]).toMatchObject({ kind: "asset", key: "fork-mtb-rigid-demo", matchesRecordedGeometry: true });
+    expect(DEMO_VISUAL_LINKS["demo-rigid-mtb-fork-480"]).toMatchObject({ kind: "asset", key: "fork-demo-mtb-480", matchesRecordedGeometry: true });
+    const m = (key: string) => manifest.assets.find((a) => a.key === key)!.measured as Record<string, number>;
+    expect(m("fork-mtb-rigid-demo").axle_to_crown_mm).toBeCloseTo(470, 0);
+    expect(m("fork-demo-mtb-480").axle_to_crown_mm).toBeCloseTo(480, 0);
+    // No recorded frame geometry chart → frame-derived measurements are estimates, never "recorded".
+    expect(hardtail.derivedQuality.wheelbaseMm.quality).toBe("estimate");
+  });
+
+  it("generated parts use the recorded MTB dimensions", () => {
+    expect(params(hardtail, "handlebar")).toMatchObject({ width_mm: 780, rise_mm: 20, backsweep_deg: 9, clamp_mm: 35, flat: 1 });
+    expect(params(hardtail, "stem")).toMatchObject({ length_mm: 50, angle_deg: 0, steerer_clamp_mm: 28.6, bar_clamp_mm: 35 });
+    expect(params(hardtail, "crankset")).toMatchObject({ crank_length_mm: 170, chainrings: [32] });
+    expect((params(hardtail, "cassette").cogs as number[])[0]).toBe(51);
+    expect(params(hardtail, "rotor_front").diameter_mm).toBe(180);
+    expect(params(hardtail, "wheel_rear")).toMatchObject({ bsd_mm: 622, old_mm: 148, rim_depth_mm: 22 });
+    expect(params(hardtail, "wheel_front").old_mm).toBe(110);
+  });
+});
+
+describe("MTB replacements: geometry, dependants, compatibility and 2D stay in sync", () => {
+  it("fork 470/44 → 480/51: front wheel moves forward, wheelbase grows, 2D fork line ends at the new axle", () => {
+    const b = resolve(swap(MTB, { fork: "demo-rigid-mtb-fork-480" }));
+    expect(node(b, "fork").status).toBe("ok");
+    expect((node(b, "fork").source as { key: string }).key).toBe("fork-demo-mtb-480");
+    expect(b.derived.wheelbaseMm!).toBeGreaterThan(hardtail.derived.wheelbaseMm!);
+    expect(b.derived.pitchDeg).not.toBe(hardtail.derived.pitchDeg);
+    // Dependants follow: front wheel sits on the new fork's axle, tire on the wheel, rotor on the hub.
+    const axle = node(b, "fork").anchorsWorld.front_axle;
+    expect(distance(node(b, "wheel_front").world!.t, axle)).toBeLessThan(TOLERANCE.attachPositionM);
+    expect(distance(node(b, "tire_front").world!.t, axle)).toBeLessThan(TOLERANCE.attachPositionM);
+    const fork2d = projectSide(b).find((p) => p.nodeId === "fork") as { points: [number, number][] };
+    expect(fork2d.points[1][0]).toBeCloseTo(node(b, "wheel_front").world!.t[0], 9);
+    expect(incompatible(swap(MTB, { fork: "demo-rigid-mtb-fork-480" }))).toEqual([]);
+    expect(b.revision.fork).not.toEqual(hardtail.revision.fork);
+  });
+
+  it("fork without recorded geometry: no 3D model, dependants unavailable, nothing borrowed", () => {
+    const b = resolve(swap(MTB, { fork: "demo-rigid-mtb-fork-unspecified" }));
+    expect(node(b, "fork")).toMatchObject({ status: "no_visual", representation: "none", source: null });
+    for (const id of ["wheel_front", "tire_front", "rotor_front"]) expect(node(b, id).status).toBe("host_unavailable");
+    expect(b.derivedQuality.wheelbaseMm.quality).toBe("unavailable");
+  });
+
+  it("flat bar 780 → 760: narrower bar, still level; unrecorded rise/backsweep are listed, not invented", () => {
+    const b = resolve(swap(MTB, { handlebar: "demo-carbon-flat-bar-760" }));
+    expect(params(b, "handlebar")).toMatchObject({ width_mm: 760, rise_mm: 0, backsweep_deg: 0 });
+    const src = node(b, "handlebar").source as { assumptions: string[] };
+    expect(src.assumptions).toEqual(expect.arrayContaining(["Rise not recorded — 0 mm shown", "Backsweep not recorded — 0° shown"]));
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(...node(b, "handlebar").world!.r));
+    expect(Math.abs(up.x)).toBeLessThan(1e-6);
+    expect(node(b, "handlebar").warnings).toEqual([]);
+  });
+
+  it("riser bar without recorded width → needs verification, no geometry", () => {
+    const b = resolve(swap(MTB, { handlebar: "demo-alloy-riser-bar-unspecified" }));
+    expect(node(b, "handlebar")).toMatchObject({ status: "missing_dimensions", missing: ["width_mm"], representation: "none" });
+  });
+
+  it("stem 50/0° → 70/+6°: bar clamp at exactly 70 mm, further forward and higher; bar follows", () => {
+    const b = resolve(swap(MTB, { stem: "demo-alloy-mtb-stem-70" }));
+    const n = node(b, "stem");
+    expect(distance(transformPoint(n.world!, [0, STEM_STACK_MM / 2000, 0]), n.anchorsWorld.bar_clamp)).toBeCloseTo(0.07, 9);
+    expect(b.derived.barClampMm!.x).toBeGreaterThan(hardtail.derived.barClampMm!.x);
+    expect(b.derived.barClampMm!.y).toBeGreaterThan(hardtail.derived.barClampMm!.y);
+    expect(distance(node(b, "handlebar").world!.t, n.anchorsWorld.bar_clamp)).toBeLessThan(TOLERANCE.attachPositionM);
+  });
+
+  it("real interface mismatch: a 31.8 mm road stem with the 35 mm MTB bar is reported by both 3D and compatibility", () => {
+    const c = swap(MTB, { stem: "demo-alloy-stem-100" });
+    expect(node(resolve(c), "handlebar").warnings).toEqual(["interface_mismatch:bar_clamp: part 35 ≠ host 31.8"]);
+    expect(incompatible(c)).toEqual(["bar-clamp"]);
+  });
+
+  it("crankset 170/32 → 175/30: pedal 5 mm lower, chain wraps the smaller ring", () => {
+    const b = resolve(swap(MTB, { crankset: "demo-m12-crankset-175-30" }));
+    expect(hardtail.derived.lowestPedalMm! - b.derived.lowestPedalMm!).toBeCloseTo(5, 6);
+    expect(params(b, "chain").ring_r).toBeCloseTo(sprocketRadius(30) * 1000, 1);
+    expect(params(hardtail, "chain").ring_r).toBeCloseTo(sprocketRadius(32) * 1000, 1);
+  });
+
+  it("cassette 10–51 Micro Spline → 10–52 XD: new cog stack, chain still on the 10T cog, compatible freehub", () => {
+    const c = swap(MTB, { cassette: "demo-x12-cassette-10-52-xd" });
+    const b = resolve(c);
+    expect((params(b, "cassette").cogs as number[])[0]).toBe(52);
+    expect(node(b, "cassette").status).toBe("ok");
+    expect(params(b, "chain").cog_r).toBeCloseTo(sprocketRadius(10) * 1000, 1);
+    expect(incompatible(c)).toEqual([]);
+    // A road HG cassette does not fit this wheelset's freehub bodies.
+    expect(incompatible(swap(MTB, { cassette: "demo-r12-cassette-11-34" }))).toEqual(["freehub"]);
+  });
+
+  it("chain replacement: geometry follows the drivetrain; an 11-speed chain is flagged against 12-speed parts", () => {
+    const c = swap(MTB, { chain: "demo-r11-chain" });
+    const b = resolve(c);
+    expect(node(b, "chain").status).toBe("ok");
+    expect(params(b, "chain").speeds).toBe(11);
+    expect(incompatible(c)).toEqual(["speed-cassette-chain", "speed-crank-chain"]);
+    // Removing the cassette leaves the chain without a host — never drawn floating.
+    expect(node(resolve(swap(MTB, { cassette: null })), "chain").status).toBe("host_unavailable");
+  });
+
+  it("rotors: 203 mm fits the fork but exceeds the frame's 180 mm limit; Center Lock is flagged on 6-bolt hubs", () => {
+    const front = resolve(swap(MTB, { front_rotor: "demo-rotor-203-6bolt" }));
+    expect(params(front, "rotor_front").diameter_mm).toBe(203);
+    expect(incompatible(swap(MTB, { front_rotor: "demo-rotor-203-6bolt" }))).toEqual([]);
+    expect(incompatible(swap(MTB, { rear_rotor: "demo-rotor-203-6bolt#rear" }))).toEqual(["rear-rotor-size"]);
+    expect(incompatible(swap(MTB, { front_rotor: "demo-rotor-160-centerlock" }))).toEqual(["rotor-mount"]);
+    // Geometry is still shown for a flagged part (the 3D view does not hide incompatibilities).
+    expect(node(resolve(swap(MTB, { rear_rotor: "demo-rotor-203-6bolt#rear" })), "rotor_rear").status).toBe("ok");
+  });
+
+  it("every replacement changes the fingerprint and the revision ref of exactly the replaced slots", () => {
+    const swaps: [BikeSlot, string, string[]][] = [
+      // The longer fork re-pitches the frame, so the chain's world-space path (derived) changes too.
+      ["fork", "demo-rigid-mtb-fork-480", ["chain", "fork"]],
+      ["handlebar", "demo-carbon-flat-bar-760", ["handlebar"]],
+      ["stem", "demo-alloy-mtb-stem-70", ["stem"]],
+      ["crankset", "demo-m12-crankset-175-30", ["crankset", "chain"]],
+      ["cassette", "demo-x12-cassette-10-52-xd", ["cassette"]],
+      ["chain", "demo-r11-chain", ["chain"]],
+      ["front_rotor", "demo-rotor-203-6bolt", ["front_rotor"]],
+    ];
+    for (const [slot, part, changed] of swaps) {
+      const b = resolve(swap(MTB, { [slot]: part }));
+      expect(b.fingerprint, slot).not.toBe(hardtail.fingerprint);
+      const diff = (Object.keys(b.revision) as BikeSlot[]).filter((k) => JSON.stringify(b.revision[k]) !== JSON.stringify(hardtail.revision[k])).sort();
+      expect(diff, slot).toEqual([...changed].sort());
+    }
+  });
+
+  it("road build is unchanged by the MTB expansion", () => {
+    expect(road.nodes.map((n) => [n.id, n.status, n.representation])).toEqual(resolve(LAB_PRESETS.road).nodes.map((n) => [n.id, n.status, n.representation]));
+    expect(node(road, "fork").source).toMatchObject({ key: "fork-demo-carbon-disc" });
+    expect(incompatible(LAB_PRESETS.road)).toEqual([]);
   });
 });

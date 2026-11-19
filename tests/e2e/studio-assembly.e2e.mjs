@@ -170,8 +170,24 @@ const ROAD_BUILD = {
   rear_rotor: "demo-rotor-160-centerlock",
 };
 
+const MTB_BUILD = {
+  frame: "demo-trail-hardtail-alloy-frame",
+  fork: "demo-rigid-mtb-fork-470",
+  wheelset: "demo-29-trail-wheelset",
+  front_tire: "demo-mtb-tire-29x2-4",
+  rear_tire: "demo-mtb-tire-29x2-4",
+  stem: "demo-alloy-mtb-stem-50",
+  handlebar: "demo-alloy-flat-bar-780",
+  seatpost: "demo-alloy-seatpost-31-6",
+  crankset: "demo-m12-crankset-170-32",
+  cassette: "demo-m12-cassette-10-51-ms",
+  chain: "demo-m12-chain",
+  front_rotor: "demo-rotor-180-6bolt",
+  rear_rotor: "demo-rotor-180-6bolt",
+};
+
 // ---------------------------------------------------------------- setup
-await step("setup: register a rider, create road / gravel / mountain bikes, apply a full road build (own token, RLS)", async () => {
+await step("setup: register a rider, create road / gravel / mountain bikes, apply full road and MTB builds (own token, RLS)", async () => {
   await page.goto(`${BASE}/register`);
   await page.fill("#email", user.email);
   await page.fill("#username", user.username);
@@ -182,17 +198,20 @@ await step("setup: register a rider, create road / gravel / mountain bikes, appl
   bikes.road = await createBike("Studio Road", "road");
   bikes.gravel = await createBike("Studio Gravel", "gravel");
   bikes.mtb = await createBike("Studio MTB", "mountain");
+  bikes.mtbFull = await createBike("Studio Hardtail", "mountain");
   const { access_token: token } = await sb("/auth/v1/token?grant_type=password", { method: "POST", body: { email: user.email, password: user.password } });
-  const slugs = [...new Set(Object.values(ROAD_BUILD))];
+  const slugs = [...new Set([...Object.values(ROAD_BUILD), ...Object.values(MTB_BUILD)])];
   const rows = await sb(`/rest/v1/components?select=id,slug&slug=in.(${slugs.join(",")})`, { token });
   const id = Object.fromEntries(rows.map((r) => [r.slug, r.id]));
   assert(slugs.every((s) => id[s]), `missing seeded components: ${slugs.filter((s) => !id[s])}`);
-  const rev = await sb("/rest/v1/rpc/apply_bicycle_configuration", {
-    method: "POST",
-    token,
-    body: { p_bicycle_id: bikes.road, p_changes: Object.entries(ROAD_BUILD).map(([slot, slug]) => ({ slot, component_id: id[slug] })), p_description: "E2E road build" },
-  });
-  assert(rev.revision_number === 1, `revision ${rev.revision_number}`);
+  for (const [bike, build, label] of [[bikes.road, ROAD_BUILD, "road"], [bikes.mtbFull, MTB_BUILD, "MTB"]]) {
+    const rev = await sb("/rest/v1/rpc/apply_bicycle_configuration", {
+      method: "POST",
+      token,
+      body: { p_bicycle_id: bike, p_changes: Object.entries(build).map(([slot, slug]) => ({ slot, component_id: id[slug] })), p_description: `E2E ${label} build` },
+    });
+    assert(rev.revision_number === 1, `${label} revision ${rev.revision_number}`);
+  }
 });
 
 // ---------------------------------------------------------------- modular viewer
@@ -315,6 +334,101 @@ await step("empty mountain bike: modular viewer with explicit empty states, no c
   assert(s.nodes.length === 0, `unexpected nodes ${s.nodes.map((n) => n.id)}`);
   await selectSlot("Frame");
   await page.getByText("No part recorded for this position.").first().waitFor();
+});
+
+// ---------------------------------------------------------------- MTB hardtail demo
+await step("MTB: full hardtail build from demo catalogue parts renders (all parts, honest labels)", async () => {
+  await page.goto(`${BASE}/garage/${bikes.mtbFull}/studio`);
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+  await settle();
+  const s = await studioState();
+  assert(s.nodes.length === 14 && s.nodes.every((n) => n.status === "ok"), `nodes: ${s.nodes.map((n) => `${n.id}:${n.status}`)}`);
+  assert(s.nodes.every((n) => n.warnings.length === 0), `warnings: ${JSON.stringify(s.nodes.filter((n) => n.warnings.length))}`);
+  const rep = Object.fromEntries(s.nodes.map((n) => [n.id, n.representation]));
+  assert(rep.frame === "representative" && rep.fork === "representative" && rep.handlebar === "generated", JSON.stringify(rep));
+  const shot = await snap();
+  assert(shot.lit / shot.pixels > 0.005, "canvas looks empty");
+  assert((await page.getByTestId("measure-wheelbaseMm").getAttribute("data-quality")) === "estimate", "wheelbase must be an estimate (no frame geometry chart)");
+});
+
+await step("MTB: replacing fork, flat bar, stem, crankset, cassette, chain and rotor (UI picker) updates 3D, dependants and 2D", async () => {
+  const swaps = [
+    ["Fork", "fork", "Demo Rigid MTB Fork 480 (51 mm offset)", (a, b) => b.derived.wheelbaseMm > a.derived.wheelbaseMm],
+    ["Handlebar", "handlebar", "Demo Carbon Flat Bar 760", () => true],
+    ["Stem", "stem", "Demo Alloy MTB Stem 70 mm (35 mm clamp, +6°)", (a, b) => b.derived.barClampMm.x > a.derived.barClampMm.x],
+    ["Crankset", "crankset", "Demo M12 Crankset 175 mm, 30T", (a, b) => Math.abs(a.derived.lowestPedalMm - b.derived.lowestPedalMm - 5) < 0.05],
+    ["Cassette", "cassette", "Demo X12 Cassette 10–52 (XD)", () => true],
+    ["Chain", "chain", "Demo R11 Chain", () => true],
+    ["Front rotor", "rotor_front", "Demo Rotor 203 mm 6-Bolt", () => true],
+  ];
+  for (const [label, id, part, check] of swaps) {
+    const a = await studioState();
+    const shot = await snap();
+    await previewPart(label, part);
+    await changedFrom(a.fingerprint);
+    const b = await studioState();
+    const na = a.nodes.find((n) => n.id === id);
+    const nb = b.nodes.find((n) => n.id === id);
+    assert(nb.status === "ok" && nb.sig !== na.sig, `${label}: node not regenerated (${nb.status})`);
+    assert(b.render.rendered[id] === nb.sig, `${label}: new geometry not on screen`);
+    assert((await snap()).hash !== shot.hash || id === "chain", `${label}: pixels unchanged`);
+    assert(check(a, b), `${label}: measurement did not change as expected`);
+    if (id === "fork") {
+      const wf = b.nodes.find((n) => n.id === "wheel_front");
+      assert(wf.sig === a.nodes.find((n) => n.id === "wheel_front").sig && b.render.rendered.wheel_front === wf.sig, "front wheel lost after fork swap");
+    }
+    if (id === "crankset") assert(b.nodes.find((n) => n.id === "chain").sig !== a.nodes.find((n) => n.id === "chain").sig, "chain did not follow the new chainring");
+  }
+  // 2D is drawn from the same (previewed) assembly.
+  await page.getByTestId("toggle-2d").click();
+  await page.getByTestId("assembly-2d").waitFor();
+  assert((await page.locator("[data-testid=assembly-2d] [data-node=fork]").count()) > 0, "2D fork missing");
+  await page.getByTestId("toggle-2d").click();
+  await page.getByTestId("assembly-canvas").waitFor();
+  await settle();
+  // Before/after against the saved MTB build.
+  const preview = await studioState();
+  await page.getByTestId("toggle-before").click();
+  await changedFrom(preview.fingerprint);
+  const saved = await studioState();
+  assert(saved.showingBefore, "Show saved did not switch");
+  await page.getByTestId("toggle-before").click();
+  await changedFrom(saved.fingerprint);
+  await closePanel();
+  await page.getByRole("button", { name: "Cancel all" }).click();
+  await settle();
+});
+
+await step("MTB: real interface mismatch (31.8 mm road stem, 35 mm bar) is flagged incompatible and reported by the 3D resolver", async () => {
+  const a = await studioState();
+  await previewPart("Stem", "Demo Alloy Stem 100 mm");
+  await changedFrom(a.fingerprint);
+  const bar = (await studioState()).nodes.find((n) => n.id === "handlebar");
+  assert(bar.warnings.some((w) => w.startsWith("interface_mismatch:bar_clamp")), `no 3D mismatch: ${bar.warnings}`);
+  await page.getByText("Incompatible").first().waitFor({ timeout: 10000 });
+  await closePanel();
+  await page.getByRole("button", { name: "Cancel all" }).click();
+  await settle();
+});
+
+await step("MTB: saving a replacement creates revision 2 and survives reload; Classic fallback still works", async () => {
+  const before = await studioState();
+  await previewPart("Crankset", "Demo M12 Crankset 175 mm, 30T");
+  await changedFrom(before.fingerprint);
+  const preview = await studioState();
+  await closePanel();
+  await page.fill('input[aria-label="Change description"]', "Longer cranks");
+  await page.getByRole("button", { name: "Save revision" }).click();
+  await page.getByText("Saved as revision 2").first().waitFor({ timeout: 20000 });
+  await page.reload();
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+  await settle();
+  assert((await studioState()).fingerprint === preview.fingerprint, "reloaded MTB assembly differs");
+  await page.getByTestId("viewer-switch").getByRole("button", { name: "Classic" }).click();
+  await page.getByTestId("modular-viewer").waitFor({ state: "detached" });
+  await page.locator("canvas").first().waitFor({ timeout: 20000 });
+  await page.getByTestId("viewer-switch").getByRole("button", { name: "Modular (beta)" }).click();
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
 });
 
 await step("tampered asset manifest is rejected: classic viewer with notice, nothing from the manifest rendered", async () => {

@@ -144,7 +144,7 @@ await step("replacing an authored part (fork) changes decoded geometry, pixels, 
   const before = await state(page);
   const shot = await snap(page);
   const svg = await page.locator("[data-testid=assembly-2d]").innerHTML();
-  await setConfig(page, { parts: { fork: "lab-rigid-mtb-fork" } });
+  await setConfig(page, { parts: { fork: "demo-rigid-mtb-fork-470" } });
   const after = await state(page);
   assert(after.render.rendered.fork.includes("fork-mtb-rigid-demo"), "new fork not rendered");
   assert(after.render.geometry.fork !== before.render.geometry.fork, "decoded fork geometry unchanged");
@@ -158,7 +158,7 @@ await step("replacing an authored part (fork) changes decoded geometry, pixels, 
 await step("replacing generated parts regenerates them and moves dependants (stem, crank, cassette, rotor)", async () => {
   const swaps = [
     ["stem", "demo-alloy-stem-90-35", (a, b) => b.derived.barClampMm.x < a.derived.barClampMm.x],
-    ["crankset", "lab-crank-175-32", (a, b) => Math.abs(a.derived.lowestPedalMm - b.derived.lowestPedalMm - 2.5) < 0.05],
+    ["crankset", "demo-m12-crankset-175-30", (a, b) => Math.abs(a.derived.lowestPedalMm - b.derived.lowestPedalMm - 2.5) < 0.05],
     ["cassette", "demo-r11-cassette-11-28", () => true],
     ["front_rotor", "demo-rotor-140-centerlock", () => true],
   ];
@@ -197,6 +197,21 @@ await step("hardtail preset replaces frame geometry and every component", async 
   await clickPreset(page, "road");
 });
 
+await step("MTB demo: hardtail fork 470 → 480 loads the second verified fork asset and moves the front wheel", async () => {
+  await clickPreset(page, "hardtail");
+  const before = await state(page);
+  const shot = await snap(page);
+  await setConfig(page, { parts: { fork: "demo-rigid-mtb-fork-480" } });
+  const after = await state(page);
+  assert(after.nodes.every((n) => n.status === "ok" && n.warnings.length === 0), `nodes: ${JSON.stringify(after.nodes.filter((n) => n.status !== "ok" || n.warnings.length))}`);
+  assert(after.render.rendered.fork.includes("fork-demo-mtb-480"), "new fork asset not rendered");
+  assert(after.render.geometry.fork !== before.render.geometry.fork, "decoded fork geometry unchanged");
+  assert(after.render.report.integrityFailures.length === 0 && after.render.report.fingerprintMismatches.length === 0, "integrity / fingerprint failure");
+  assert(after.derived.wheelbaseMm > before.derived.wheelbaseMm, "wheelbase did not grow");
+  assert((await snap(page)).hash !== shot.hash, "pixels unchanged");
+  await clickPreset(page, "road");
+});
+
 await step("missing dimensions: explicit 'needs verification' state and no stale geometry", async () => {
   await setConfig(page, { parts: { handlebar: "demo-carbon-drop-bar-400" } });
   const s = await state(page);
@@ -228,7 +243,7 @@ await step("rim-brake wheelset: rotors explicitly unavailable, not floating", as
 await step("reference-counted cache: memory returns to baseline after repeated swaps", async () => {
   const base = { ...(await state(page)), mem: await gpu(page) };
   for (let i = 0; i < 4; i++) {
-    for (const parts of [{ fork: "lab-rigid-mtb-fork" }, { crankset: "lab-crank-175-32" }, { stem: "demo-alloy-stem-90-35" }, { fork: "demo-carbon-disc-fork", crankset: "demo-r12-crankset-50-34", stem: "demo-alloy-stem-100" }]) await setConfig(page, { parts });
+    for (const parts of [{ fork: "demo-rigid-mtb-fork-470" }, { crankset: "demo-m12-crankset-175-30" }, { stem: "demo-alloy-stem-90-35" }, { fork: "demo-carbon-disc-fork", crankset: "demo-r12-crankset-50-34", stem: "demo-alloy-stem-100" }]) await setConfig(page, { parts });
     await clickPreset(page, "hardtail");
     await clickPreset(page, "road");
   }
