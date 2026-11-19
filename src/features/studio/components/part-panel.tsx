@@ -1,6 +1,7 @@
 "use client";
 import { ArrowRight, Box, Info, Trash2, Undo2, X } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { ProvenanceBadge } from "@/components/common/provenance";
 import { DataValue } from "@/components/common/data-value";
@@ -25,10 +26,12 @@ interface Props {
   onModeChange: (mode: "detail" | "replace") => void;
   onPending: (action: PendingAction | null) => void;
   onClose: () => void;
+  /** Modular engine: truthful 3D status for the saved part and the pending preview. */
+  geometry?: { saved: ReactNode; preview: ReactNode };
 }
 
 /** Contextual panel for the selected slot: current part, pending preview, and the replacement flow. */
-export function PartPanel({ slot, installed, pending, context, meta, mode, onModeChange, onPending, onClose }: Props) {
+export function PartPanel({ slot, installed, pending, context, meta, mode, onModeChange, onPending, onClose, geometry }: Props) {
   const mapping = meta.slots[slot];
   const visual = mapping?.visual.kind ?? "none";
   const pendingComponent = pending?.kind === "replace" ? pending.component : null;
@@ -73,6 +76,7 @@ export function PartPanel({ slot, installed, pending, context, meta, mode, onMod
               </div>
             </dl>
             {installed.installedOn && <p className="text-xs text-muted-foreground">Installed {formatDate(installed.installedOn)}</p>}
+            {geometry && !pending && geometry.saved}
             {mode === "detail" && <SpecList specs={installed.specs} attributes={installed.attributes} />}
             {installed.componentSlug && mode === "detail" && (
               <Link href={`/components/${installed.componentSlug}`} className="text-xs text-accent hover:underline">Component page</Link>
@@ -103,7 +107,8 @@ export function PartPanel({ slot, installed, pending, context, meta, mode, onMod
           )}
           {report && <CompatDetails report={report} />}
           {pending.kind === "custom" && <p className="text-xs text-muted-foreground">Custom parts have no structured data — compatibility cannot be verified.</p>}
-          {pending.kind !== "remove" && (
+          {pending.kind !== "remove" && geometry && geometry.preview}
+          {pending.kind !== "remove" && !geometry && (
             <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
               {visual === "tire-width" ? <Box className="mt-px size-3.5 shrink-0 text-info" /> : <Info className="mt-px size-3.5 shrink-0" />}
               {visual === "tire-width"

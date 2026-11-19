@@ -1,5 +1,5 @@
 /**
- * Published asset set (public/lab-assets): integrity, decoder equivalence (WASM vs JS
+ * Published asset set (public/model-assets): integrity, decoder equivalence (WASM vs JS
  * reference), contract after decoding, immutable naming, vendored decoder drift.
  */
 import { describe, expect, it } from "vitest";
@@ -9,14 +9,14 @@ import { join } from "node:path";
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { MeshoptDecoder } from "meshoptimizer";
-import { MeshoptDecoder as ReferenceDecoder } from "../../src/features/lab/vendor/meshopt_decoder_reference.js";
+import { MeshoptDecoder as ReferenceDecoder } from "../../src/features/studio/assembly/vendor/meshopt_decoder_reference.js";
 import { geometryFingerprint } from "@/lib/assembly/fingerprint";
 import { validateAsset } from "@/lib/assembly/validate";
 import type { AssetManifest } from "@/lib/assembly/spec";
 import { measure } from "../../scripts/assets/measure.mts";
 
 const ROOT = join(__dirname, "..", "..");
-const LAB = join(ROOT, "public", "lab-assets");
+const LAB = join(ROOT, "public", "model-assets");
 const sha = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
 const pointer = readFileSync(join(LAB, "manifest.json"));
 const manifest = JSON.parse(pointer.toString()) as AssetManifest;
@@ -25,7 +25,7 @@ describe("published asset set", () => {
   it("the manifest pointer equals an immutable, content-addressed manifest file", () => {
     const immutable = readFileSync(join(LAB, `manifest-${sha(pointer).slice(0, 12)}.json`));
     expect(sha(immutable)).toBe(sha(pointer));
-    expect(manifest.assets.map((a) => a.key).sort()).toEqual(["fork-gravel-demo", "fork-mtb-rigid-demo", "fork-road-demo", "frame-hardtail-demo", "frame-road-demo"]);
+    expect(manifest.assets.map((a) => a.key).sort()).toEqual(["fork-demo-carbon-disc", "fork-gravel-demo", "fork-mtb-rigid-demo", "fork-road-demo", "frame-hardtail-demo", "frame-road-demo"]);
   });
 
   it("every file is content-hashed and matches its SHA-256", () => {
@@ -70,6 +70,6 @@ describe("vendored decoders stay identical to their packages", () => {
     for (const f of ["basis_transcoder.js", "basis_transcoder.wasm"]) {
       expect(sha(readFileSync(join(ROOT, "public/vendor/basis", f))), f).toBe(sha(readFileSync(join(ROOT, "node_modules/three/examples/jsm/libs/basis", f))));
     }
-    expect(sha(readFileSync(join(ROOT, "src/features/lab/vendor/meshopt_decoder_reference.js")))).toBe(sha(readFileSync(join(ROOT, "node_modules/meshoptimizer/meshopt_decoder_reference.js"))));
+    expect(sha(readFileSync(join(ROOT, "src/features/studio/assembly/vendor/meshopt_decoder_reference.js")))).toBe(sha(readFileSync(join(ROOT, "node_modules/meshoptimizer/meshopt_decoder_reference.js"))));
   });
 });

@@ -16,6 +16,13 @@ import { applyConfiguration } from "@/server/actions/configuration";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import type { InstalledPart } from "@/types/domain";
 import { cn } from "@/lib/utils";
+import { resolveAssembly, manifestIndex } from "@/lib/assembly/resolve";
+import type { AssemblyInput, AssemblySpec } from "@/lib/assembly/spec";
+import { ENGINE_ENABLED, setViewerChoice, useVerifiedManifest, useViewerChoice, type ManifestRef } from "../assembly/engine";
+import { engineTarget, toPartInput } from "../assembly/demo-bindings";
+import { ModularViewer } from "../assembly/ModularViewer";
+import { GeometryStatus } from "../assembly/GeometryStatus";
+import { AssemblyMeasurements } from "../assembly/AssemblyMeasurements";
 import { PartPanel } from "./part-panel";
 import { SlotList } from "./slot-list";
 import { CompatBadge } from "./compat-badge";
@@ -23,12 +30,26 @@ import { CompatBadge } from "./compat-badge";
 interface Props {
   bikeId: string;
   modelKey: string;
+  category: string;
   paintColor: string | null;
   installed: InstalledPart[];
   initialSlot?: BikeSlot | null;
+  manifestRef: ManifestRef | null;
 }
 
-export function StudioClient({ bikeId, modelKey, paintColor, installed, initialSlot = null }: Props) {
+/** Resolver input for the configuration: installed parts with pending changes applied. */
+function assemblyInput(category: AssemblyInput["category"], installed: InstalledPart[], pending: PendingMap): AssemblyInput {
+  const parts: AssemblyInput["parts"] = {};
+  for (const p of installed) parts[p.slot] = toPartInput(p.slot, p, p.custom);
+  for (const [slot, action] of Object.entries(pending) as [BikeSlot, PendingAction][]) {
+    if (action.kind === "remove") delete parts[slot];
+    else if (action.kind === "custom") parts[slot] = toPartInput(slot, { componentSlug: null, name: action.name, specs: [], attributes: {} }, true);
+    else parts[slot] = toPartInput(slot, { componentSlug: action.component.slug, name: action.component.name, specs: action.component.specs, attributes: action.component.attributes });
+  }
+  return { category, parts };
+}
+
+export function StudioClient({ bikeId, modelKey, category, paintColor, installed, initialSlot = null, manifestRef }: Props) {
   const router = useRouter();
   const meta = getModelMeta(modelKey);
   const isDesktop = useMediaQuery("(min-width: 1024px)", true);
@@ -63,7 +84,31 @@ export function StudioClient({ bikeId, modelKey, paintColor, installed, initialS
   }, []);
 
   const installedMap = useMemo(() => new Map(installed.map((p) => [p.slot, p])), [installed]);
-  const geometrySlots = useMemo(() => new Set(BIKE_SLOTS.filter((s) => slotHasGeometry(meta, s))), [meta]);
+
+  // ---- Modular assembly engine (feature switch; classic viewer stays available) ----
+  const choice = useViewerChoice();
+  const target = engineTarget(category);
+  const [fallbackReason, setFallbackReason] = useState<string | null>(null);
+  const wantModular = ENGINE_ENABLED && choice === "modular";
+  const { manifest, error: manifestError } = useVerifiedManifest(wantModular && target ? manifestRef : null);
+  const manifestMap = useMemo(() => (manifest ? manifestIndex(manifest) : null), [manifest]);
+  const savedSpec: AssemblySpec | null = useMemo(() => (manifest && target ? resolveAssembly(assemblyInput(target, installed, {}), manifest) : null), [manifest, target, installed]);
+  const previewSpec: AssemblySpec | null = useMemo(() => (manifest && target ? resolveAssembly(assemblyInput(target, installed, pending), manifest) : null), [manifest, target, installed, pending]);
+  const modular = wantModular && !!target && !!previewSpec && !!savedSpec && !!manifestMap && !fallbackReason;
+  const engineNotice = !wantModular
+    ? null
+    : !target
+      ? `Modular 3D isn't available for ${category.replace(/_/g, " ")} bikes yet — showing the classic viewer.`
+      : manifestError || (!manifestRef && "3D asset manifest unavailable")
+        ? "3D assets could not be verified — showing the classic viewer."
+        : fallbackReason
+          ? `The modular viewer stopped (${fallbackReason}) — showing the classic viewer.`
+          : null;
+
+  const geometrySlots = useMemo(
+    () => (modular && previewSpec ? new Set(previewSpec.nodes.filter((n) => n.status === "ok" && n.slot).map((n) => n.slot as BikeSlot)) : new Set(BIKE_SLOTS.filter((s) => slotHasGeometry(meta, s)))),
+    [modular, previewSpec, meta],
+  );
   const changes = useMemo(() => buildChanges(installed, pending), [installed, pending]);
   const pendingSlots = useMemo(() => Object.keys(pending) as BikeSlot[], [pending]);
 
@@ -141,9 +186,10 @@ export function StudioClient({ bikeId, modelKey, paintColor, installed, initialS
       onModeChange={setMode}
       onPending={(a) => setPendingFor(selected, a)}
       onClose={() => select(null)}
+      geometry={modular && savedSpec && previewSpec ? { saved: <GeometryStatus spec={savedSpec} slot={selected} />, preview: <GeometryStatus spec={previewSpec} slot={selected} /> } : undefined}
     />
   ) : (
-    <BuildOverview installedCount={installed.length} incompatible={incompatible} unknown={unknown} checks={buildChecks.length} />
+    <BuildOverview installedCount={installed.length} incompatible={incompatible} unknown={unknown} checks={buildChecks.length} measurements={modular && previewSpec ? <AssemblyMeasurements spec={previewSpec} /> : null} />
   );
 
   const pendingCount = Object.keys(pending).length;
@@ -156,16 +202,55 @@ export function StudioClient({ bikeId, modelKey, paintColor, installed, initialS
       </aside>
 
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <LazyBikeViewer
-          modelKey={modelKey}
-          selectedSlot={selected}
-          onSelectSlot={select}
-          pendingSlots={pendingSlots}
-          recordedSlots={recordedSlots}
-          paintColor={paintColor}
-          tireWidthMm={{ front: tireWidth("front_tire"), rear: tireWidth("rear_tire") }}
-          className="h-[58dvh] min-h-[340px] lg:h-auto lg:flex-1"
-        />
+        {ENGINE_ENABLED && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-1.5 text-xs" data-testid="viewer-switch">
+            <span className="text-muted-foreground">Viewer</span>
+            {(["modular", "classic"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={choice === v}
+                onClick={() => {
+                  setFallbackReason(null);
+                  setViewerChoice(v);
+                }}
+                className={cn("rounded-sm border px-2 py-0.5", choice === v ? "border-accent text-accent" : "border-border text-muted-foreground")}
+              >
+                {v === "modular" ? "Modular (beta)" : "Classic"}
+              </button>
+            ))}
+            {engineNotice && <span className="text-warning" role="status" data-testid="engine-notice">{engineNotice}</span>}
+          </div>
+        )}
+        {modular && previewSpec && savedSpec && manifestMap && manifestRef ? (
+          <ModularViewer
+            spec={previewSpec}
+            savedSpec={savedSpec}
+            manifest={manifestMap}
+            baseUrl={manifestRef.baseUrl}
+            selectedSlot={selected}
+            pendingSlots={pendingSlots}
+            paintColor={paintColor}
+            onSelectSlot={select}
+            onFallback={setFallbackReason}
+            className="h-[58dvh] min-h-[340px] lg:h-auto lg:flex-1"
+          />
+        ) : wantModular && target && !engineNotice ? (
+          <div className="grid h-[58dvh] min-h-[340px] place-items-center lg:h-auto lg:flex-1" role="status">
+            <span className="eyebrow">Verifying 3D assets…</span>
+          </div>
+        ) : (
+          <LazyBikeViewer
+            modelKey={modelKey}
+            selectedSlot={selected}
+            onSelectSlot={select}
+            pendingSlots={pendingSlots}
+            recordedSlots={recordedSlots}
+            paintColor={paintColor}
+            tireWidthMm={{ front: tireWidth("front_tire"), rear: tireWidth("rear_tire") }}
+            className="h-[58dvh] min-h-[340px] lg:h-auto lg:flex-1"
+          />
+        )}
         <div className="absolute right-3 top-3 lg:hidden">
           <Button size="sm" variant="secondary" onClick={() => setSlotsOpen(true)}>
             <ListTree /> Parts
@@ -245,7 +330,7 @@ export function StudioClient({ bikeId, modelKey, paintColor, installed, initialS
   );
 }
 
-function BuildOverview({ installedCount, incompatible, unknown, checks }: { installedCount: number; incompatible: number; unknown: number; checks: number }) {
+function BuildOverview({ installedCount, incompatible, unknown, checks, measurements }: { installedCount: number; incompatible: number; unknown: number; checks: number; measurements?: React.ReactNode }) {
   return (
     <div className={cn("flex flex-col gap-4")}>
       <div>
@@ -262,6 +347,7 @@ function BuildOverview({ installedCount, incompatible, unknown, checks }: { inst
         <ShieldCheck className="mt-px size-3.5 shrink-0" />
         Select a part on the model or in the list. Replacements are previewed first and only saved — as a new build revision — when you confirm.
       </p>
+      {measurements}
     </div>
   );
 }

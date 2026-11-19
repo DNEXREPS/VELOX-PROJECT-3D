@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Assembly lab (P0)", robots: { index:
 /**
  * P0 technical prototype of the modular 3D assembly. Only available when the server runs
  * with VELOX_LABS=1 (never set in production). Asset source: `?source=static` (default,
- * public/lab-assets) or `?source=supabase` (public bucket model-assets on the configured
+ * public/model-assets) or `?source=supabase` (public bucket model-assets on the configured
  * Supabase project). `?csp=no-wasm` simulates browsers without WebAssembly CSP support.
  */
 export default async function AssemblyLabPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -28,13 +28,13 @@ export default async function AssemblyLabPage({ searchParams }: { searchParams: 
   const enableKtx2 = params.ktx2 === "1";
 
   // Trusted pointer: the server knows which immutable manifest to use and its SHA-256.
-  const pointer = readFileSync(join(process.cwd(), "public", "lab-assets", "manifest.json"));
+  const pointer = readFileSync(join(process.cwd(), "public", "model-assets", "manifest.json"));
   const manifestSha = createHash("sha256").update(pointer).digest("hex");
   const manifestFile = `manifest-${manifestSha.slice(0, 12)}.json`;
   const baseUrl =
     source === "supabase" && process.env.NEXT_PUBLIC_SUPABASE_URL
       ? `${process.env.NEXT_PUBLIC_SUPABASE_URL.replace(/\/$/, "")}/storage/v1/object/public/model-assets/`
-      : "/lab-assets/";
+      : "/model-assets/";
 
   return (
     <Container className="flex flex-col gap-6 py-10">
