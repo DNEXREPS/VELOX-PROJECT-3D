@@ -24,8 +24,10 @@ export const stem: GeneratorDef = {
     const length = num(dims, "length_mm");
     const angle = num(dims, "angle_deg");
     const missing = [length === null && "length_mm", angle === null && "angle_deg"].filter(Boolean) as string[];
-    const steerer = num(dims, "steerer_clamp_mm") ?? (assume(assumptions, "Steerer clamp diameter not recorded — 28.6 mm shown"), 28.6);
-    const bar = num(dims, "bar_clamp_mm") ?? (assume(assumptions, "Handlebar clamp diameter not recorded — 31.8 mm shown"), 31.8);
+    const steererRecorded = num(dims, "steerer_clamp_mm");
+    const barRecorded = num(dims, "bar_clamp_mm");
+    const steerer = steererRecorded ?? (assume(assumptions, "Steerer clamp diameter not recorded — 28.6 mm shown"), 28.6);
+    const bar = barRecorded ?? (assume(assumptions, "Handlebar clamp diameter not recorded — 31.8 mm shown"), 31.8);
     assume(assumptions, `Stem clamp stack height not recorded — ${STEM_STACK_MM} mm shown`);
     const params = { length_mm: length ?? 0, angle_deg: angle ?? 0, steerer_clamp_mm: steerer, bar_clamp_mm: bar, stack_mm: STEM_STACK_MM };
     const a = THREE.MathUtils.degToRad(params.angle_deg);
@@ -35,8 +37,9 @@ export const stem: GeneratorDef = {
       missing,
       params,
       assumptions,
-      mounts: { steerer_clamp: { node: "MNT__steerer_clamp", type: "tube", pose: interfaceFrame("tube", [0, 0, 0], [0, 1, 0]), standard: String(steerer) } },
-      anchors: { bar_clamp: { node: "ANC__bar_clamp", type: "clamp", pose: frameFromAxis(c, [0, 0, 1], [0, 1, 0]), standard: String(bar) } },
+      mounts: { steerer_clamp: { node: "MNT__steerer_clamp", type: "tube", pose: interfaceFrame("tube", [0, 0, 0], [0, 1, 0]), standard: steererRecorded === null ? undefined : String(steerer) } },
+      // Interface standards only from recorded data — a display default is never compared.
+      anchors: { bar_clamp: { node: "ANC__bar_clamp", type: "clamp", pose: frameFromAxis(c, [0, 0, 1], [0, 1, 0]), standard: barRecorded === null ? undefined : String(bar) } },
     };
   },
   profile2d(p) {
@@ -89,7 +92,8 @@ export const handlebar: GeneratorDef = {
       const flare = num(dims, "flare_deg") ?? (assume(assumptions, "Flare not recorded — 0° shown"), 0);
       params = { width_mm: width ?? 0, reach_mm: reach ?? 0, drop_mm: drop ?? 0, flare_deg: flare, flat: 0 };
     }
-    const clamp = num(dims, "clamp_mm", "bar_clamp_mm") ?? (assume(assumptions, "Clamp diameter not recorded — 31.8 mm shown"), 31.8);
+    const clampRecorded = num(dims, "clamp_mm", "bar_clamp_mm");
+    const clamp = clampRecorded ?? (assume(assumptions, "Clamp diameter not recorded — 31.8 mm shown"), 31.8);
     params.clamp_mm = clamp;
     const half = (params.width_mm as number) / 2000;
     const leverX = params.flat ? -Math.sin(THREE.MathUtils.degToRad(params.backsweep_deg)) * half * 0.6 : params.reach_mm / 1000;
@@ -99,7 +103,7 @@ export const handlebar: GeneratorDef = {
       missing,
       params,
       assumptions,
-      mounts: { clamp: { node: "MNT__clamp", type: "clamp", pose: interfaceFrame("clamp", [0, 0, 0], [0, 0, 1]), standard: String(clamp) } },
+      mounts: { clamp: { node: "MNT__clamp", type: "clamp", pose: interfaceFrame("clamp", [0, 0, 0], [0, 0, 1]), standard: clampRecorded === null ? undefined : String(clamp) } },
       anchors: {
         lever_r: { node: "ANC__lever_r", type: "clamp", pose: interfaceFrame("clamp", [leverX, leverY, half - 0.02], [0, 0, 1]) },
         lever_l: { node: "ANC__lever_l", type: "clamp", pose: interfaceFrame("clamp", [leverX, leverY, -(half - 0.02)], [0, 0, 1]) },

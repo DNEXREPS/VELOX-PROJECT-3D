@@ -121,10 +121,21 @@ function attach(child: Built, host: Built, anchorId: string, mountId: string, sl
     return;
   }
   if (anchor.type !== mount.type) child.node.warnings.push(`${child.node.id}: interface type ${mount.type} does not match ${anchorId} (${anchor.type})`);
-  if (anchor.standard && mount.standard && anchor.standard !== mount.standard) child.node.warnings.push(`interface_mismatch:${anchorId}: part ${mount.standard} ≠ host ${anchor.standard}`);
+  const hostStd = anchor.standard ? comparableStandard(anchorId, anchor.standard) : undefined;
+  if (hostStd && mount.standard && hostStd !== mount.standard) child.node.warnings.push(`interface_mismatch:${anchorId}: part ${mount.standard} ≠ host ${anchor.standard}`);
   if (anchor.slide && (slide < anchor.slide.min - 1e-9 || slide > anchor.slide.max + 1e-9)) child.node.warnings.push(`${child.node.id}: slide ${slide} outside ${anchor.slide.min}…${anchor.slide.max} at ${anchorId}`);
   child.node.attach = { parent: host.node.id, anchor: anchorId, mount: mountId, slide, angle };
   child.node.local = attachPose(anchor.pose, mount.pose, slide, angle);
+}
+
+/**
+ * Headset anchors carry a headset standard; the stem clamps the steerer, so compare the
+ * steerer diameter the headset's upper bearing takes. Unknown headset → no comparison
+ * (neither a match nor a mismatch is claimed).
+ */
+const HEADSET_UPPER_STEERER_MM: Record<string, string> = { "tapered_1.125_1.5": "28.6", zs44_ec49: "28.6", "straight_1.125": "28.6" };
+function comparableStandard(anchorId: string, standard: string): string | undefined {
+  return anchorId === "head_upper" ? HEADSET_UPPER_STEERER_MM[standard] : standard;
 }
 
 function setWorld(b: Built, parent: Built | null) {
