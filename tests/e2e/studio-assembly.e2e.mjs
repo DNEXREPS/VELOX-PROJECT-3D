@@ -15,6 +15,7 @@
  */
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
 
 async function loadPlaywright() {
   try {
@@ -24,6 +25,7 @@ async function loadPlaywright() {
   }
 }
 const pw = await loadPlaywright();
+if (process.env.E2E_SHOTS) mkdirSync(process.env.E2E_SHOTS, { recursive: true });
 const BASE = process.argv[2] ?? "http://localhost:3000";
 const ENGINE = process.env.E2E_BROWSER ?? "chromium";
 const DEVICE = process.env.E2E_DEVICE;
@@ -43,6 +45,13 @@ const step = async (name, fn) => {
   } catch (e) {
     results.push(["FAIL", name]);
     console.log("FAIL", name, "-", String(e.message).split("\n")[0]);
+    // Diagnostics: Playwright's call log says which element and why it was not actionable.
+    const log = String(e.message).split("\n").slice(1).filter((l) => l.trim()).slice(0, 12);
+    if (log.length) console.log("  " + log.join("\n  "));
+    if (process.env.E2E_SHOTS && typeof page !== "undefined") {
+      const file = `${process.env.E2E_SHOTS}/studio-${ENGINE}-${(DEVICE ?? "desktop").replace(/\W+/g, "-")}-${results.length}.png`;
+      await page.screenshot({ path: file, fullPage: true }).then(() => console.log("  screenshot:", file)).catch(() => {});
+    }
   }
 };
 const assert = (c, m) => {
@@ -90,6 +99,12 @@ async function settle(p = page, timeout = 40000) {
 async function changedFrom(before, p = page) {
   await p.waitForFunction((f) => window.__veloxStudio && window.__veloxStudio.fingerprint !== f, before, { timeout: 15000 });
   await settle(p);
+}
+/** Fresh studio page for a bike, so one failed step cannot leave UI state behind for the next. */
+async function openStudio(bikeId) {
+  await page.goto(`${BASE}/garage/${bikeId}/studio`);
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+  await settle();
 }
 const snap = (p = page) =>
   p.evaluate(() => {
@@ -352,6 +367,7 @@ await step("MTB: full hardtail build from demo catalogue parts renders (all part
 });
 
 await step("MTB: replacing fork, flat bar, stem, crankset, cassette, chain and rotor (UI picker) updates 3D, dependants and 2D", async () => {
+  await openStudio(bikes.mtbFull);
   const swaps = [
     ["Fork", "fork", "Demo Rigid MTB Fork 480 (51 mm offset)", (a, b) => b.derived.wheelbaseMm > a.derived.wheelbaseMm],
     ["Handlebar", "handlebar", "Demo Carbon Flat Bar 760", () => true],
@@ -400,6 +416,7 @@ await step("MTB: replacing fork, flat bar, stem, crankset, cassette, chain and r
 });
 
 await step("MTB: real interface mismatch (31.8 mm road stem, 35 mm bar) is flagged incompatible and reported by the 3D resolver", async () => {
+  await openStudio(bikes.mtbFull);
   const a = await studioState();
   await previewPart("Stem", "Demo Alloy Stem 100 mm");
   await changedFrom(a.fingerprint);
@@ -412,6 +429,7 @@ await step("MTB: real interface mismatch (31.8 mm road stem, 35 mm bar) is flagg
 });
 
 await step("MTB: saving a replacement creates revision 2 and survives reload; Classic fallback still works", async () => {
+  await openStudio(bikes.mtbFull);
   const before = await studioState();
   await previewPart("Crankset", "Demo M12 Crankset 175 mm, 30T");
   await changedFrom(before.fingerprint);

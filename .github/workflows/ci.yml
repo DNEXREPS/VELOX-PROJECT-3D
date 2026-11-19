@@ -150,19 +150,19 @@ jobs:
 
       - name: Studio assembly · Chromium desktop
         if: (success() || failure()) && steps.engine.outcome == 'success'
-        run: node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
+        run: E2E_SHOTS="${RUNNER_TEMP}/e2e-screenshots-engine" node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
 
       - name: Studio assembly · WebKit desktop (Linux WebKit, not Safari)
         if: (success() || failure()) && steps.engine.outcome == 'success'
-        run: E2E_BROWSER=webkit node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
+        run: E2E_BROWSER=webkit E2E_SHOTS="${RUNNER_TEMP}/e2e-screenshots-engine" node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
 
       - name: Studio assembly · WebKit iPhone 15 emulation
         if: (success() || failure()) && steps.engine.outcome == 'success'
-        run: E2E_BROWSER=webkit E2E_DEVICE="iPhone 15" node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
+        run: E2E_BROWSER=webkit E2E_DEVICE="iPhone 15" E2E_SHOTS="${RUNNER_TEMP}/e2e-screenshots-engine" node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
 
       - name: Studio assembly · WebKit iPad Pro 11 emulation
         if: (success() || failure()) && steps.engine.outcome == 'success'
-        run: E2E_BROWSER=webkit E2E_DEVICE="iPad Pro 11" node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
+        run: E2E_BROWSER=webkit E2E_DEVICE="iPad Pro 11" E2E_SHOTS="${RUNNER_TEMP}/e2e-screenshots-engine" node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
 
       - name: Upload screenshots and server log on failure
         if: failure()
