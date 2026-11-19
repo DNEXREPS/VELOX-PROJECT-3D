@@ -139,9 +139,11 @@ jobs:
         run: E2E_ASSEMBLY_ENGINE=1 node tests/e2e/journey.e2e.mjs http://localhost:3000 "${RUNNER_TEMP}/e2e-screenshots-engine"
 
       - name: Security E2E with the engine on
-        run: node tests/e2e/security.e2e.mjs http://localhost:3000
+        if: success() || failure()
+        run: E2E_ASSEMBLY_ENGINE=1 node tests/e2e/security.e2e.mjs http://localhost:3000
 
       - name: Studio assembly · Chromium desktop
+        if: success() || failure()
         run: node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
 
       - name: Studio assembly · WebKit desktop (Linux WebKit, not Safari)

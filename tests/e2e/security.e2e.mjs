@@ -146,7 +146,9 @@ await step("no CSP violations on public and private pages, including the 3D stud
     if (path === "/" || path.endsWith("/studio")) {
       await page.locator("canvas").first().waitFor({ timeout: 20000 });
       await page.waitForTimeout(1500);
-      assert((await page.locator("[data-testid=bike-viewer] canvas").count()) > 0, `3D canvas missing on ${path}`);
+      // With NEXT_PUBLIC_ASSEMBLY_ENGINE=1 the studio renders the modular viewer instead of the classic one.
+      const viewer = path.endsWith("/studio") && process.env.E2E_ASSEMBLY_ENGINE === "1" ? "assembly-canvas" : "bike-viewer";
+      assert((await page.locator(`[data-testid=${viewer}] canvas`).count()) > 0, `3D canvas (${viewer}) missing on ${path}`);
     } else {
       await page.waitForLoadState("networkidle");
     }
