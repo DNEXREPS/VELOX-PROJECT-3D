@@ -3,7 +3,10 @@
  *
  * Scripts: strict nonce + 'strict-dynamic' (a fresh nonce per request, set in proxy.ts;
  * Next.js applies it to its own scripts automatically). No inline event handlers, no eval
- * in production.
+ * in production. 'wasm-unsafe-eval' permits compiling WebAssembly ONLY (meshopt geometry
+ * and Basis/KTX2 texture decoders); it does not allow eval(), new Function() or string
+ * timers. Browsers that do not support the keyword fall back to the JS meshopt decoder
+ * and PNG textures (docs/3d-engine/specification.md §8).
  *
  * Styles: 'unsafe-inline' is kept for style-src. React, Radix and Recharts render inline
  * `style` attributes, which nonces cannot cover; style injection is a much smaller risk
@@ -21,6 +24,8 @@ export interface CspOptions {
   /** Only for HTTPS deployments; on http://localhost it would break same-origin assets. */
   upgradeInsecureRequests?: boolean;
   reportUri?: string | null;
+  /** WebAssembly decoders (default true). false is used by the lab to simulate browsers without wasm CSP support. */
+  allowWasm?: boolean;
 }
 
 function origin(url: string | null | undefined): string | null {
@@ -39,7 +44,7 @@ export function buildCsp(opts: CspOptions): string {
 
   const directives: [string, string[]][] = [
     ["default-src", ["'self'"]],
-    ["script-src", ["'self'", `'nonce-${opts.nonce}'`, "'strict-dynamic'", ...(opts.isDev ? ["'unsafe-eval'"] : [])]],
+    ["script-src", ["'self'", `'nonce-${opts.nonce}'`, "'strict-dynamic'", ...(opts.allowWasm === false ? [] : ["'wasm-unsafe-eval'"]), ...(opts.isDev ? ["'unsafe-eval'"] : [])]],
     ["style-src", ["'self'", "'unsafe-inline'"]],
     ["img-src", ["'self'", "data:", "blob:", ...(supabase ? [supabase] : []), ...imageHosts]],
     ["font-src", ["'self'"]],

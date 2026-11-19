@@ -1,0 +1,723 @@
+{
+  "spec": "velox-assembly/1",
+  "manifestVersion": 1,
+  "generatedAt": "pipeline",
+  "assets": [
+    {
+      "spec": "velox-assembly/1",
+      "key": "fork-gravel-demo",
+      "version": 1,
+      "kind": "fork",
+      "label": "VELOX Demo gravel fork (carbon, 395 mm)",
+      "representation": "representative",
+      "categories": [
+        "gravel",
+        "road"
+      ],
+      "units": "m",
+      "mounts": {
+        "crown_race": {
+          "node": "MNT__crown_race",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0,
+              0,
+              0
+            ],
+            "r": [
+              -0.5,
+              -0.5,
+              0.5,
+              -0.5
+            ]
+          },
+          "standard": "tapered_1.125_1.5"
+        }
+      },
+      "anchors": {
+        "steerer": {
+          "node": "ANC__steerer",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0,
+              0.3,
+              0
+            ],
+            "r": [
+              0.5,
+              0.5,
+              0.5,
+              -0.5
+            ]
+          }
+        },
+        "front_axle": {
+          "node": "ANC__front_axle",
+          "type": "axle",
+          "pose": {
+            "t": [
+              0.05,
+              -0.395,
+              0
+            ],
+            "r": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "standard": "12x100"
+        },
+        "front_brake": {
+          "node": "ANC__front_brake",
+          "type": "face",
+          "pose": {
+            "t": [
+              0.020000000000000004,
+              -0.335,
+              -0.055
+            ],
+            "r": [
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          "standard": "flat_mount_140"
+        }
+      },
+      "measured": {
+        "axle_to_crown_mm": 395,
+        "offset_mm": 50
+      },
+      "materials": {
+        "MAT__paint_secondary": "paint_secondary"
+      },
+      "license": {
+        "id": "LicenseRef-VELOX-demo",
+        "attribution": "VELOX demo asset (fictional fork)"
+      },
+      "author": "VELOX P0 author D",
+      "source": "scripts/assets/authors/forks-demo.mts",
+      "demo": true,
+      "file": "models/fork/fork-gravel-demo/1-02f04037e985.glb",
+      "sha256": "02f04037e985fdf3629a85acd504a01f9db4316df37cedd7953a294c2de7cb39",
+      "bytes": 7476,
+      "triangles": 204,
+      "geometryFingerprint": "13c0ee592f0654f0",
+      "compression": "meshopt",
+      "textures": [],
+      "pipeline": "velox-pipeline/0.1"
+    },
+    {
+      "spec": "velox-assembly/1",
+      "key": "fork-mtb-rigid-demo",
+      "version": 1,
+      "kind": "fork",
+      "label": "VELOX Demo 29\" rigid MTB fork (470 mm)",
+      "representation": "representative",
+      "categories": [
+        "mtb_hardtail"
+      ],
+      "units": "m",
+      "mounts": {
+        "crown_race": {
+          "node": "MNT__crown_race",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0,
+              0,
+              0
+            ],
+            "r": [
+              -0.5,
+              -0.5,
+              0.5,
+              -0.5
+            ]
+          },
+          "standard": "zs44_ec49"
+        }
+      },
+      "anchors": {
+        "steerer": {
+          "node": "ANC__steerer",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0,
+              0.3,
+              0
+            ],
+            "r": [
+              0.5,
+              0.5,
+              0.5,
+              -0.5
+            ]
+          }
+        },
+        "front_axle": {
+          "node": "ANC__front_axle",
+          "type": "axle",
+          "pose": {
+            "t": [
+              0.044,
+              -0.47,
+              0
+            ],
+            "r": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "standard": "15x110_boost"
+        },
+        "front_brake": {
+          "node": "ANC__front_brake",
+          "type": "face",
+          "pose": {
+            "t": [
+              0.013999999999999999,
+              -0.41,
+              -0.065
+            ],
+            "r": [
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          "standard": "flat_mount_140"
+        }
+      },
+      "measured": {
+        "axle_to_crown_mm": 470,
+        "offset_mm": 44
+      },
+      "materials": {
+        "MAT__paint_secondary": "paint_secondary"
+      },
+      "license": {
+        "id": "LicenseRef-VELOX-demo",
+        "attribution": "VELOX demo asset (fictional fork)"
+      },
+      "author": "VELOX P0 author E",
+      "source": "scripts/assets/authors/forks-demo.mts",
+      "demo": true,
+      "file": "models/fork/fork-mtb-rigid-demo/1-8c1f3614875b.glb",
+      "sha256": "8c1f3614875b271d5455cb3f4408f54149ef1deb7d9f14c51eb5bd8c9b4cd191",
+      "bytes": 7472,
+      "triangles": 204,
+      "geometryFingerprint": "791a341c97ae699b",
+      "compression": "meshopt",
+      "textures": [],
+      "pipeline": "velox-pipeline/0.1"
+    },
+    {
+      "spec": "velox-assembly/1",
+      "key": "fork-road-demo",
+      "version": 1,
+      "kind": "fork",
+      "label": "VELOX Demo road fork (carbon, 370 mm)",
+      "representation": "representative",
+      "categories": [
+        "road"
+      ],
+      "units": "m",
+      "mounts": {
+        "crown_race": {
+          "node": "MNT__crown_race",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0,
+              0,
+              0
+            ],
+            "r": [
+              -0.5,
+              -0.5,
+              0.5,
+              -0.5
+            ]
+          },
+          "standard": "tapered_1.125_1.5"
+        }
+      },
+      "anchors": {
+        "steerer": {
+          "node": "ANC__steerer",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0,
+              0.3,
+              0
+            ],
+            "r": [
+              0.5,
+              0.5,
+              0.5,
+              -0.5
+            ]
+          }
+        },
+        "front_axle": {
+          "node": "ANC__front_axle",
+          "type": "axle",
+          "pose": {
+            "t": [
+              0.045,
+              -0.37,
+              0
+            ],
+            "r": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "standard": "12x100"
+        },
+        "front_brake": {
+          "node": "ANC__front_brake",
+          "type": "face",
+          "pose": {
+            "t": [
+              0.015,
+              -0.31,
+              -0.05
+            ],
+            "r": [
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          "standard": "flat_mount_140"
+        }
+      },
+      "measured": {
+        "axle_to_crown_mm": 370,
+        "offset_mm": 45
+      },
+      "materials": {
+        "MAT__paint_secondary": "paint_secondary"
+      },
+      "license": {
+        "id": "LicenseRef-VELOX-demo",
+        "attribution": "VELOX demo asset (fictional fork)"
+      },
+      "author": "VELOX P0 author C",
+      "source": "scripts/assets/authors/forks-demo.mts",
+      "demo": true,
+      "file": "models/fork/fork-road-demo/1-1635b7e0bdc1.glb",
+      "sha256": "1635b7e0bdc19d447fc63c95dac6a4d59b6e75e861b8919d8989cb2b469ea6f4",
+      "bytes": 7428,
+      "triangles": 204,
+      "geometryFingerprint": "c0722067f55cf5fd",
+      "compression": "meshopt",
+      "textures": [],
+      "pipeline": "velox-pipeline/0.1"
+    },
+    {
+      "spec": "velox-assembly/1",
+      "key": "frame-hardtail-demo",
+      "version": 1,
+      "kind": "frame",
+      "label": "VELOX Demo 29\" hardtail frame (L)",
+      "representation": "representative",
+      "categories": [
+        "mtb_hardtail"
+      ],
+      "template": "hardtail",
+      "units": "m",
+      "anchors": {
+        "bb": {
+          "node": "ANC__bb",
+          "type": "spindle",
+          "pose": {
+            "t": [
+              0,
+              0,
+              0
+            ],
+            "r": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "standard": "bsa_73"
+        },
+        "rear_axle": {
+          "node": "ANC__rear_axle",
+          "type": "axle",
+          "pose": {
+            "t": [
+              -0.43084219849035216,
+              0.06,
+              0
+            ],
+            "r": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "standard": "12x148_boost"
+        },
+        "head_upper": {
+          "node": "ANC__head_upper",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0.455,
+              0.625,
+              0
+            ],
+            "r": [
+              -0.38252671715311637,
+              -0.5947043893095626,
+              -0.3825267171531163,
+              0.5947043893095626
+            ]
+          },
+          "standard": "zs44_ec49",
+          "slide": {
+            "min": 0,
+            "max": 0.03
+          }
+        },
+        "head_lower": {
+          "node": "ANC__head_lower",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0.5006162566921863,
+              0.5249042602035803,
+              0
+            ],
+            "r": [
+              0.38252671715311637,
+              0.5947043893095626,
+              -0.3825267171531163,
+              0.5947043893095626
+            ]
+          },
+          "standard": "zs44_ec49"
+        },
+        "seat_tube": {
+          "node": "ANC__seat_tube",
+          "type": "tube",
+          "pose": {
+            "t": [
+              -0.10644563406385388,
+              0.42693011956143845,
+              0
+            ],
+            "r": [
+              -0.4353384041180873,
+              -0.5572077475232348,
+              -0.4353384041180873,
+              0.5572077475232348
+            ]
+          },
+          "standard": "31.6",
+          "slide": {
+            "min": -0.26,
+            "max": -0.1
+          }
+        },
+        "rd_hanger": {
+          "node": "ANC__rd_hanger",
+          "type": "face",
+          "pose": {
+            "t": [
+              -0.43084219849035216,
+              0.034999999999999996,
+              0.077
+            ],
+            "r": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "standard": "udh"
+        },
+        "rear_brake": {
+          "node": "ANC__rear_brake",
+          "type": "face",
+          "pose": {
+            "t": [
+              -0.38084219849035217,
+              0.09,
+              -0.07
+            ],
+            "r": [
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          "standard": "post_mount_180"
+        }
+      },
+      "mounts": {},
+      "measured": {
+        "stack_mm": 625,
+        "reach_mm": 455,
+        "head_angle_deg": 65.5,
+        "seat_angle_deg": 76,
+        "chainstay_mm": 435,
+        "bb_drop_mm": 60,
+        "wheel_bsd_mm": 622,
+        "head_tube_mm": 110
+      },
+      "materials": {
+        "MAT__paint_primary": "paint_primary"
+      },
+      "license": {
+        "id": "LicenseRef-VELOX-demo",
+        "attribution": "VELOX demo asset (fictional frame)"
+      },
+      "author": "VELOX P0 author B",
+      "source": "scripts/assets/authors/frame-hardtail-demo.mts",
+      "demo": true,
+      "file": "models/frame/frame-hardtail-demo/1-ce71a7674c9b.glb",
+      "sha256": "ce71a7674c9b825fdcd10e850a2408736a36517234683357df26cdeb678b9622",
+      "bytes": 18348,
+      "triangles": 592,
+      "geometryFingerprint": "d1dd0261d80d4e6d",
+      "compression": "meshopt",
+      "textures": [],
+      "pipeline": "velox-pipeline/0.1"
+    },
+    {
+      "spec": "velox-assembly/1",
+      "key": "frame-road-demo",
+      "version": 1,
+      "kind": "frame",
+      "label": "VELOX Demo road frame (M)",
+      "representation": "representative",
+      "categories": [
+        "road"
+      ],
+      "template": "diamond",
+      "units": "m",
+      "anchors": {
+        "bb": {
+          "node": "ANC__bb",
+          "type": "spindle",
+          "pose": {
+            "t": [
+              0,
+              0,
+              0
+            ],
+            "r": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "standard": "bsa_68"
+        },
+        "rear_axle": {
+          "node": "ANC__rear_axle",
+          "type": "axle",
+          "pose": {
+            "t": [
+              -0.4039801975344831,
+              0.07,
+              0
+            ],
+            "r": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "standard": "12x142"
+        },
+        "head_upper": {
+          "node": "ANC__head_upper",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0.385,
+              0.56,
+              0
+            ],
+            "r": [
+              -0.418119062138922,
+              -0.5702424483288387,
+              -0.418119062138922,
+              0.5702424483288386
+            ]
+          },
+          "standard": "tapered_1.125_1.5",
+          "slide": {
+            "min": 0,
+            "max": 0.04
+          }
+        },
+        "head_lower": {
+          "node": "ANC__head_lower",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0.430105869925641,
+              0.41694245738776603,
+              0
+            ],
+            "r": [
+              0.418119062138922,
+              0.5702424483288387,
+              -0.418119062138922,
+              0.5702424483288386
+            ]
+          },
+          "standard": "tapered_1.125_1.5"
+        },
+        "seat_tube": {
+          "node": "ANC__seat_tube",
+          "type": "tube",
+          "pose": {
+            "t": [
+              -0.14768797924603985,
+              0.4985862621314604,
+              0
+            ],
+            "r": [
+              -0.4230793824142455,
+              -0.5665720044054249,
+              -0.4230793824142455,
+              0.5665720044054248
+            ]
+          },
+          "standard": "27.2",
+          "slide": {
+            "min": -0.3,
+            "max": -0.08
+          }
+        },
+        "rd_hanger": {
+          "node": "ANC__rd_hanger",
+          "type": "face",
+          "pose": {
+            "t": [
+              -0.4039801975344831,
+              0.045000000000000005,
+              0.07
+            ],
+            "r": [
+              0,
+              0,
+              0,
+              1
+            ]
+          }
+        },
+        "rear_brake": {
+          "node": "ANC__rear_brake",
+          "type": "face",
+          "pose": {
+            "t": [
+              -0.3339801975344831,
+              0.05800000000000001,
+              -0.06
+            ],
+            "r": [
+              0.5,
+              0.5,
+              0.5,
+              -0.5
+            ]
+          },
+          "standard": "flat_mount_140"
+        },
+        "fd_mount": {
+          "node": "ANC__fd_mount",
+          "type": "face",
+          "pose": {
+            "t": [
+              -0.06628260859966686,
+              0.16299935492759282,
+              0
+            ],
+            "r": [
+              0.10146460606020084,
+              -0.6997892066308599,
+              0.10146460606020084,
+              0.6997892066308599
+            ]
+          },
+          "standard": "braze_on"
+        }
+      },
+      "mounts": {},
+      "measured": {
+        "stack_mm": 560,
+        "reach_mm": 385,
+        "head_angle_deg": 72.5,
+        "seat_angle_deg": 73.5,
+        "chainstay_mm": 410,
+        "bb_drop_mm": 70,
+        "wheel_bsd_mm": 622,
+        "head_tube_mm": 150
+      },
+      "materials": {
+        "MAT__carbon": "carbon"
+      },
+      "license": {
+        "id": "LicenseRef-VELOX-demo",
+        "attribution": "VELOX demo asset (fictional frame)"
+      },
+      "author": "VELOX P0 author A",
+      "source": "scripts/assets/authors/frame-road-demo.mts",
+      "demo": true,
+      "file": "models/frame/frame-road-demo/1-2eb23d6f61d1.glb",
+      "sha256": "2eb23d6f61d186e15d77bd8dc3c665f3c44f673ad7506078c22a2747976aefde",
+      "bytes": 15992,
+      "triangles": 592,
+      "geometryFingerprint": "a99f6074053f19c9",
+      "compression": "meshopt",
+      "textures": [
+        {
+          "role": "carbon",
+          "ktx2": {
+            "file": "textures/frame-road-demo/1-carbon-12557e6b381c.ktx2",
+            "sha256": "12557e6b381c617195a21b41a4ac7eb7c2e3ac6b90a01b1254e4a9bc2fc7d969",
+            "bytes": 1019
+          },
+          "fallback": {
+            "file": "textures/frame-road-demo/1-carbon-5d6b9360cf50.png",
+            "sha256": "5d6b9360cf50d9be002548f4a0a929fe0441e24432eee57f2ab96c1091799351",
+            "bytes": 647,
+            "mime": "image/png"
+          }
+        }
+      ],
+      "pipeline": "velox-pipeline/0.1"
+    }
+  ]
+}

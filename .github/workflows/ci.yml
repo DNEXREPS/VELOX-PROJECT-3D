@@ -33,6 +33,11 @@ jobs:
       # Includes static security guards (server-action auth, service-role isolation,
       # additive-only migrations) in tests/unit/security-guards.test.ts.
       - run: npm test
+      - name: 3D asset pipeline is reproducible (re-author + re-run, committed output must match)
+        run: |
+          for f in scripts/assets/authors/*.mts; do npx tsx "$f"; done
+          npx tsx scripts/assets/pipeline.mts
+          git diff --exit-code -- assets-src public/lab-assets
       - run: npm run build
 
   database:
@@ -104,7 +109,7 @@ jobs:
       - name: Build and start the production server
         run: |
           npm run build
-          nohup npm start > "$SERVER_LOG" 2>&1 &
+          VELOX_LABS=1 nohup npm start > "$SERVER_LOG" 2>&1 &
           for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/ && exit 0; sleep 1; done
           echo "server did not start"; cat "$SERVER_LOG"; exit 1
 
@@ -113,6 +118,11 @@ jobs:
 
       - name: Security E2E (CSP, uploads, storage cleanup, rate limits, monitoring, auth links)
         run: node tests/e2e/security.e2e.mjs http://localhost:3000
+
+      - name: P0 assembly lab (Chromium; static and Supabase-hosted assets)
+        run: |
+          npx tsx scripts/assets/publish-local.mts
+          E2E_SUPABASE=1 node tests/e2e/assembly-lab.e2e.mjs http://localhost:3000
 
       - name: Upload screenshots and server log on failure
         if: failure()
@@ -123,3 +133,32 @@ jobs:
             ${{ runner.temp }}/e2e-screenshots
             ${{ runner.temp }}/next-start.log
           retention-days: 7
+
+  webkit-devices:
+    name: P0 assembly lab · WebKit (desktop, iPhone, iPad emulation)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright WebKit
+        run: |
+          npm install --no-save playwright@${PLAYWRIGHT_VERSION}
+          npx playwright install webkit
+      - name: Build and start (labs enabled, no backend needed)
+        run: |
+          npm run build
+          VELOX_LABS=1 nohup npm start > "${RUNNER_TEMP}/next.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/lab/assembly && exit 0; sleep 1; done
+          cat "${RUNNER_TEMP}/next.log"; exit 1
+      - name: WebKit desktop
+        run: E2E_BROWSER=webkit node tests/e2e/assembly-lab.e2e.mjs http://localhost:3000
+      - name: WebKit · iPhone 15 emulation
+        run: E2E_BROWSER=webkit E2E_DEVICE="iPhone 15" node tests/e2e/assembly-lab.e2e.mjs http://localhost:3000
+      - name: WebKit · iPad Pro 11 emulation
+        run: E2E_BROWSER=webkit E2E_DEVICE="iPad Pro 11" node tests/e2e/assembly-lab.e2e.mjs http://localhost:3000

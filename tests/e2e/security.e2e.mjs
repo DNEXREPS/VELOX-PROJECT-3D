@@ -106,7 +106,9 @@ await step("CSP header with a per-request nonce on every page; all framework scr
   const b = await fetch(`${BASE}/`);
   const csp = a.headers.get("content-security-policy") ?? "";
   assert(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' 'strict-dynamic'/.test(csp), "script-src nonce missing");
-  assert(!/script-src[^;]*unsafe-(inline|eval)/.test(csp), "unsafe script source");
+  const scriptTokens = (/script-src ([^;]*)/.exec(csp)?.[1] ?? "").split(" ");
+  assert(!scriptTokens.includes("'unsafe-inline'") && !scriptTokens.includes("'unsafe-eval'"), "unsafe script source");
+  assert(scriptTokens.includes("'wasm-unsafe-eval'"), "WebAssembly decoders not permitted");
   assert(csp !== b.headers.get("content-security-policy"), "nonce is reused across requests");
   const nonce = /nonce-([^']+)/.exec(csp)[1];
   const html = await a.text();
