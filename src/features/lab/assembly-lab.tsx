@@ -29,6 +29,8 @@ export function AssemblyLab({ baseUrl, manifestFile, manifestSha, source, cspMod
   const [manifest, setManifest] = useState<AssetManifest | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [config, setConfig] = useState<LabConfig>(LAB_PRESETS.road);
+  // Incremented on every programmatic change so tests can wait for the new state (no fixed sleeps).
+  const [seq, setSeq] = useState(0);
   const [render, setRender] = useState<RenderState | null>(null);
   const [csp, setCsp] = useState<string[]>([]);
   const [selected, setSelected] = useState<BikeSlot | null>(null);
@@ -46,9 +48,12 @@ export function AssemblyLab({ baseUrl, manifestFile, manifestSha, source, cspMod
   const spec: AssemblySpec | null = useMemo(() => (manifest ? resolveAssembly(labInput(config), manifest) : null), [manifest, config]);
 
   useEffect(() => {
-    window.__veloxLabSet = (patch) =>
+    window.__veloxLabSet = (patch) => {
       setConfig((prev) => (patch.preset ? LAB_PRESETS[patch.preset] : { category: patch.category ?? prev.category, parts: { ...prev.parts, ...(patch.parts ?? {}) } }));
+      setSeq((n) => n + 1);
+    };
     window.__veloxLab = spec && {
+      seq,
       config,
       source,
       cspMode,
@@ -60,7 +65,7 @@ export function AssemblyLab({ baseUrl, manifestFile, manifestSha, source, cspMod
       render,
       cspViolations: csp,
     };
-  }, [spec, render, csp, config, source, cspMode]);
+  }, [spec, render, csp, config, source, cspMode, seq]);
 
   if (loadError) return <p className="text-sm text-danger" data-testid="lab-error">Manifest could not be loaded: {loadError}</p>;
   if (!spec) return <p className="text-sm text-muted-foreground">Loading verified asset manifest…</p>;
@@ -70,7 +75,10 @@ export function AssemblyLab({ baseUrl, manifestFile, manifestSha, source, cspMod
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end gap-3">
         {Object.entries(LAB_PRESETS).map(([id, p]) => (
-          <Button key={id} size="sm" variant="outline" data-testid={`preset-${id}`} onClick={() => setConfig(p)}>
+          <Button key={id} size="sm" variant="outline" data-testid={`preset-${id}`} onClick={() => {
+              setConfig(p);
+              setSeq((n) => n + 1);
+            }}>
             {CATEGORY_PROFILES[p.category].label} preset
           </Button>
         ))}

@@ -1,5 +1,5 @@
 /**
- * P0 prototype E2E — modular assembly lab (/lab/assembly, server started with VELOX_LABS=1).
+ * Modular assembly lab E2E (production renderer, P1) (/lab/assembly, server started with VELOX_LABS=1).
  *
  *   node tests/e2e/assembly-lab.e2e.mjs [baseUrl]
  *   E2E_BROWSER=webkit E2E_DEVICE="iPhone 15" node tests/e2e/assembly-lab.e2e.mjs   (macOS CI)
@@ -78,14 +78,26 @@ async function waitSettled(page, timeout) {
 }
 const state = (page) => page.evaluate(() => JSON.parse(JSON.stringify(window.__veloxLab)));
 const setConfig = async (page, patch) => {
-  await page.evaluate((p) => window.__veloxLabSet(p), patch);
-  await page.waitForTimeout(50);
+  const seq = await page.evaluate((p) => {
+    const before = window.__veloxLab.seq;
+    window.__veloxLabSet(p);
+    return before;
+  }, patch);
+  // Wait for the state published AFTER this change, then for it to finish rendering.
+  await page.waitForFunction((s) => window.__veloxLab?.seq > s, seq, { timeout: 10000 });
+  await settle(page);
+};
+/** Click a preset button (real UI path) and wait for the resulting state to render. */
+const clickPreset = async (page, id) => {
+  const seq = await page.evaluate(() => window.__veloxLab.seq);
+  await page.getByTestId(`preset-${id}`).click();
+  await page.waitForFunction((s) => window.__veloxLab?.seq > s, seq, { timeout: 10000 });
   await settle(page);
 };
 /** Hash + coverage of the rendered WebGL canvas. */
 const snap = (page) =>
   page.evaluate(() => {
-    const src = document.querySelector("[data-testid=lab-canvas] canvas");
+    const src = document.querySelector("[data-testid=assembly-canvas] canvas");
     const c = document.createElement("canvas");
     c.width = src.width;
     c.height = src.height;
@@ -106,99 +118,132 @@ const pixelDiff = (a, b) => Math.abs(a.fg - b.fg) / a.pixels;
 const gpu = async (page) => {
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   await page.waitForTimeout(300);
-  return page.evaluate(() => window.__veloxLabMemory());
+  return page.evaluate(() => window.__veloxAssemblyMemory());
 };
 
 const { page, errors, ctx } = await openLab();
 
-await step("assembles independently authored frame + fork with generated wheels and tires", async () => {
+await step("assembles the full road build (frame, fork, wheels, tires, cockpit, seatpost, drivetrain, rotors)", async () => {
   const s = await state(page);
+  assert(s.nodes.length === 14, `nodes: ${s.nodes.map((n) => n.id).join(",")}`);
   assert(s.nodes.every((n) => n.status === "ok"), `nodes: ${s.nodes.map((n) => `${n.id}:${n.status}`).join(",")}`);
+  assert(s.nodes.every((n) => n.warnings.length === 0), `warnings: ${JSON.stringify(s.nodes.filter((n) => n.warnings.length))}`);
   assert(s.render.report.decoder === "wasm", `decoder ${s.render.report.decoder} (${s.render.report.decoderError})`);
   assert(s.render.report.integrityFailures.length === 0, "integrity failures");
-  assert(s.render.report.fingerprintMatches === 2 && s.render.report.fingerprintMismatches.length === 0, `fingerprints: ${JSON.stringify(s.render.report.fingerprintMismatches)}`);
+  assert(s.render.report.fingerprintMatches >= 2 && s.render.report.fingerprintMismatches.length === 0, `fingerprints: ${JSON.stringify(s.render.report.fingerprintMismatches)}`);
   assert(s.cspViolations.length === 0, `CSP violations: ${s.cspViolations}`);
   assert(s.render.report.ktx2 === "disabled", `ktx2 ${s.render.report.ktx2}`);
   const shot = await snap(page);
   assert(shot.fg / shot.pixels > 0.005, `canvas looks empty (${shot.fg} lit pixels)`);
-  assert(await page.locator("[data-testid=lab-2d] polyline").count() >= 3, "2D projection missing");
+  assert((await page.locator("[data-testid=assembly-2d] polyline").count()) >= 8, "2D projection missing");
+  assert((await page.getByTestId("geometry-fork").getAttribute("data-representation")) === "representative", "fork not labelled representative");
+  assert((await page.getByTestId("geometry-stem").getAttribute("data-representation")) === "generated", "stem not labelled generated");
 });
 
-await step("replacing the fork changes the decoded geometry, the rendered pixels, the 2D view and the derived geometry", async () => {
+await step("replacing an authored part (fork) changes decoded geometry, pixels, 2D view and derived geometry", async () => {
   const before = await state(page);
   const shot = await snap(page);
-  const svg = await page.locator("[data-testid=lab-2d]").innerHTML();
-  await setConfig(page, { fork: "fork-gravel-demo" });
+  const svg = await page.locator("[data-testid=assembly-2d]").innerHTML();
+  await setConfig(page, { parts: { fork: "lab-rigid-mtb-fork" } });
   const after = await state(page);
-  assert(after.render.rendered.fork.includes("fork-gravel-demo"), "new fork not rendered");
+  assert(after.render.rendered.fork.includes("fork-mtb-rigid-demo"), "new fork not rendered");
   assert(after.render.geometry.fork !== before.render.geometry.fork, "decoded fork geometry unchanged");
   assert(after.derived.wheelbaseMm > before.derived.wheelbaseMm, "wheelbase did not change");
   assert(after.fingerprint !== before.fingerprint, "assembly fingerprint unchanged");
-  const shot2 = await snap(page);
-  assert(shot2.hash !== shot.hash, "rendered pixels identical after replacement");
-  assert((await page.locator("[data-testid=lab-2d]").innerHTML()) !== svg, "2D view unchanged");
-  await setConfig(page, { fork: "fork-road-demo" });
+  assert((await snap(page)).hash !== shot.hash, "rendered pixels identical after replacement");
+  assert((await page.locator("[data-testid=assembly-2d]").innerHTML()) !== svg, "2D view unchanged");
+  await setConfig(page, { preset: "road" });
 });
 
-await step("changing tire width regenerates the tire and raises the bike", async () => {
+await step("replacing generated parts regenerates them and moves dependants (stem, crank, cassette, rotor)", async () => {
+  const swaps = [
+    ["stem", "demo-alloy-stem-90-35", (a, b) => b.derived.barClampMm.x < a.derived.barClampMm.x],
+    ["crankset", "lab-crank-175-32", (a, b) => Math.abs(a.derived.lowestPedalMm - b.derived.lowestPedalMm - 2.5) < 0.05],
+    ["cassette", "demo-r11-cassette-11-28", () => true],
+    ["front_rotor", "demo-rotor-140-centerlock", () => true],
+  ];
+  for (const [slot, part, check] of swaps) {
+    const a = await state(page);
+    const shot = await snap(page);
+    await setConfig(page, { parts: { [slot]: part } });
+    const b = await state(page);
+    const id = a.nodes.find((n) => n.slot === slot).id;
+    assert(b.render.geometry[id] !== a.render.geometry[id], `${slot}: geometry unchanged`);
+    assert((await snap(page)).hash !== shot.hash, `${slot}: pixels unchanged`);
+    assert(check(a, b), `${slot}: measurement did not change as expected`);
+    if (slot === "cassette") assert(b.render.geometry.chain !== a.render.geometry.chain, "chain did not follow the cassette");
+  }
+  await setConfig(page, { preset: "road" });
+});
+
+await step("tire width regenerates the tires and raises the bike", async () => {
   const before = await state(page);
-  await setConfig(page, { front: "45", rear: "45" });
+  await setConfig(page, { parts: { front_tire: "demo-gravel-tire-700x40", rear_tire: "demo-gravel-tire-700x40#rear" } });
   const after = await state(page);
   assert(after.render.geometry.tire_front !== before.render.geometry.tire_front, "tire geometry unchanged");
-  assert(after.derived.bbHeightMm > before.derived.bbHeightMm + 10, `BB height ${before.derived.bbHeightMm} → ${after.derived.bbHeightMm}`);
-  await setConfig(page, { front: "28", rear: "28" });
+  assert(after.derived.bbHeightMm > before.derived.bbHeightMm + 8, `BB height ${before.derived.bbHeightMm} → ${after.derived.bbHeightMm}`);
+  await setConfig(page, { preset: "road" });
 });
 
-await step("a different frame geometry (hardtail preset) replaces frame, fork, wheels and tires", async () => {
+await step("hardtail preset replaces frame geometry and every component", async () => {
   const before = await state(page);
   const shot = await snap(page);
-  await page.getByTestId("preset-hardtail").click();
-  await settle(page);
+  await clickPreset(page, "hardtail");
   const after = await state(page);
   assert(after.nodes.every((n) => n.status === "ok"), `nodes: ${after.nodes.map((n) => `${n.id}:${n.status}`).join(",")}`);
   assert(after.render.geometry.frame !== before.render.geometry.frame, "frame geometry unchanged");
+  assert(after.render.geometry.handlebar !== before.render.geometry.handlebar, "flat bar not generated");
   assert(pixelDiff(shot, await snap(page)) > 0.0005, "frame swap barely changed the image");
-  await page.getByTestId("preset-road").click();
-  await settle(page);
+  await clickPreset(page, "road");
 });
 
-await step("missing dimensions: explicit 'needs verification' state and no stale tire geometry", async () => {
-  await setConfig(page, { front: "missing" });
+await step("missing dimensions: explicit 'needs verification' state and no stale geometry", async () => {
+  await setConfig(page, { parts: { handlebar: "demo-carbon-drop-bar-400" } });
   const s = await state(page);
-  const tire = s.nodes.find((n) => n.id === "tire_front");
-  assert(tire.status === "missing_dimensions" && tire.missing.includes("width_mm"), JSON.stringify(tire));
-  assert(s.render.rendered.tire_front === undefined && s.render.geometry.tire_front === undefined, "old tire geometry still on screen");
-  assert(await page.getByTestId("node-tire_front").getByText("Unavailable — needs verification: width_mm").isVisible(), "missing state not shown");
-  await setConfig(page, { front: "28" });
+  const bar = s.nodes.find((n) => n.id === "handlebar");
+  assert(bar.status === "missing_dimensions" && bar.missing.includes("drop_mm"), JSON.stringify(bar));
+  assert(s.render.rendered.handlebar === undefined && s.render.geometry.handlebar === undefined, "old handlebar geometry still on screen");
+  assert(await page.getByTestId("node-handlebar").getByText("Unavailable — needs verification: drop not recorded").isVisible(), "missing state not shown");
+  await setConfig(page, { preset: "road" });
 });
 
 await step("a part without a 3D model removes the old fork (and everything mounted on it)", async () => {
-  await setConfig(page, { fork: "fork-no-model" });
+  await setConfig(page, { parts: { fork: "demo-steel-rim-fork" } });
   const s = await state(page);
-  for (const id of ["fork", "wheel_front", "tire_front"]) assert(s.render.rendered[id] === undefined, `${id} still rendered`);
-  await setConfig(page, { fork: "fork-road-demo" });
+  for (const id of ["fork", "wheel_front", "tire_front", "rotor_front"]) assert(s.render.rendered[id] === undefined, `${id} still rendered`);
+  assert(await page.getByTestId("node-fork").getByText("No 3D model for this part").isVisible(), "no-model state not shown");
+  await setConfig(page, { preset: "road" });
+});
+
+await step("rim-brake wheelset: rotors explicitly unavailable, not floating", async () => {
+  await setConfig(page, { parts: { wheelset: "demo-alloy-rim-brake-wheelset" } });
+  const s = await state(page);
+  for (const id of ["rotor_front", "rotor_rear"]) {
+    assert(s.nodes.find((n) => n.id === id).status === "host_unavailable", `${id} not host_unavailable`);
+    assert(s.render.rendered[id] === undefined, `${id} still rendered`);
+  }
+  await setConfig(page, { preset: "road" });
 });
 
 await step("reference-counted cache: memory returns to baseline after repeated swaps", async () => {
   const base = { ...(await state(page)), mem: await gpu(page) };
   for (let i = 0; i < 4; i++) {
-    for (const fork of ["fork-gravel-demo", "fork-mtb-rigid-demo", "fork-road-demo"]) await setConfig(page, { fork });
-    await page.getByTestId("preset-hardtail").click();
-    await settle(page);
-    await page.getByTestId("preset-road").click();
-    await settle(page);
+    for (const parts of [{ fork: "lab-rigid-mtb-fork" }, { crankset: "lab-crank-175-32" }, { stem: "demo-alloy-stem-90-35" }, { fork: "demo-carbon-disc-fork", crankset: "demo-r12-crankset-50-34", stem: "demo-alloy-stem-100" }]) await setConfig(page, { parts });
+    await clickPreset(page, "hardtail");
+    await clickPreset(page, "road");
   }
   const end = { ...(await state(page)), mem: await gpu(page) };
+  assert(end.fingerprint === base.fingerprint, "did not return to the same assembly");
   assert(end.mem.geometries === base.mem.geometries, `geometries ${base.mem.geometries} → ${end.mem.geometries}`);
   assert(end.mem.textures === base.mem.textures, `textures ${base.mem.textures} → ${end.mem.textures}`);
-  console.log(`  GPU: ${base.mem.geometries} geometries / ${base.mem.textures} textures before and after 20 swaps`);
+  console.log(`  GPU: ${base.mem.geometries} geometries / ${base.mem.textures} textures before and after 24 swaps`);
   assert(JSON.stringify(end.render.cachedAssets.sort()) === JSON.stringify(base.render.cachedAssets.sort()), `cache ${end.render.cachedAssets}`);
 });
 await ctx.close();
 
 await step("integrity: a tampered asset is rejected before parsing and never rendered", async () => {
   const lab = await openLab("", async (p) => {
-    await p.route("**/models/fork/fork-road-demo/**", async (route) => {
+    await p.route("**/models/fork/fork-demo-carbon-disc/**", async (route) => {
       const res = await route.fetch();
       const body = Buffer.from(await res.body());
       body[body.length - 8] ^= 0xff;
@@ -217,7 +262,7 @@ await step("CSP without WebAssembly (older Safari model): JS decoder, same geome
   const lab = await openLab("?csp=no-wasm&ktx2=1");
   const s = await state(lab.page);
   assert(s.render.report.decoder === "js-reference", `decoder ${s.render.report.decoder}`);
-  assert(s.render.report.fingerprintMatches === 2 && s.render.report.fingerprintMismatches.length === 0, "decoded geometry differs under the JS decoder");
+  assert(s.render.report.fingerprintMatches >= 2 && s.render.report.fingerprintMismatches.length === 0, "decoded geometry differs under the JS decoder");
   assert(Object.values(s.render.report.textures).every((t) => t === "png-fallback"), JSON.stringify(s.render.report.textures));
   assert(s.cspViolations.every((v) => v.startsWith("script-src") && v.includes("wasm")), `unexpected violations: ${s.cspViolations}`);
   assert(s.nodes.every((n) => s.render.rendered[n.id] === n.sig), "not all nodes rendered");
@@ -244,7 +289,7 @@ if (process.env.E2E_SUPABASE === "1") {
     const s = await state(lab.page);
     assert(s.source === "supabase", "wrong source");
     assert(s.render.report.integrityChecks >= 2 && s.render.report.integrityFailures.length === 0, "integrity");
-    assert(s.render.report.fingerprintMatches === 2, "fingerprints");
+    assert(s.render.report.fingerprintMatches >= 2, "fingerprints");
     assert(s.cspViolations.length === 0, `CSP violations: ${s.cspViolations}`);
     await lab.ctx.close();
   });
