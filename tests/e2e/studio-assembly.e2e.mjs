@@ -119,6 +119,12 @@ async function selectSlot(label) {
   }
   await page.getByRole("button", { name: /^(Add part|Replace part)$/ }).waitFor({ timeout: 10000 });
 }
+/** Phones/tablets: the part sheet covers the pending-changes bar; close it like a user would. */
+async function closePanel() {
+  if (desktop()) return;
+  const close = page.getByRole("button", { name: "Close panel" });
+  if (await close.isVisible()) await close.click();
+}
 async function previewPart(label, partName) {
   await selectSlot(label);
   await page.getByRole("button", { name: /^(Add part|Replace part)$/ }).click();
@@ -260,12 +266,14 @@ await step("2D side view is drawn from the same assembly and is interactive", as
 });
 
 await step("saving creates revision 2 and the viewer shows the saved geometry", async () => {
+  await closePanel();
   await page.getByRole("button", { name: "Cancel all" }).click();
   await settle();
   const before = await studioState();
   await previewPart("Front rotor", "Demo Rotor 140 mm Center Lock");
   await changedFrom(before.fingerprint);
   const preview = await studioState();
+  await closePanel();
   await page.fill('input[aria-label="Change description"]', "Smaller front rotor");
   await page.getByRole("button", { name: "Save revision" }).click();
   await page.getByText("Saved as revision 2").first().waitFor({ timeout: 20000 });
@@ -306,7 +314,7 @@ await step("empty mountain bike: modular viewer with explicit empty states, no c
   const s = await studioState();
   assert(s.nodes.length === 0, `unexpected nodes ${s.nodes.map((n) => n.id)}`);
   await selectSlot("Frame");
-  await page.getByText("No part recorded.").first().waitFor();
+  await page.getByText("No part recorded for this position.").first().waitFor();
 });
 
 await step("tampered asset manifest is rejected: classic viewer with notice, nothing from the manifest rendered", async () => {
@@ -334,7 +342,11 @@ await step("layout: no horizontal overflow in the studio", async () => {
 });
 
 await step("no uncaught page errors", async () => {
-  const relevant = pageErrors.filter((e) => !/ResizeObserver loop/.test(e));
+  // WebKit reports same-origin fetches cancelled by a navigation (RSC prefetches, the classic
+  // viewer's GLB) as "… due to access control checks". Those are aborts, not application errors.
+  const host = new URL(BASE).host;
+  const aborted = (e) => e.includes(`${host}/`) && /due to access control checks/.test(e);
+  const relevant = pageErrors.filter((e) => !/ResizeObserver loop/.test(e) && !aborted(e));
   assert(relevant.length === 0, relevant.slice(0, 3).join(" | "));
 });
 
