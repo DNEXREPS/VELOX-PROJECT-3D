@@ -129,6 +129,8 @@ async function selectSlot(label) {
   if (desktop()) {
     await page.locator("aside nav button", { hasText: label }).first().click();
   } else {
+    // On short phone screens the open part sheet covers the "Parts" button: close it first, as a rider would.
+    await closePanel();
     await page.getByRole("button", { name: "Parts", exact: true }).click();
     await page.getByRole("dialog").locator("nav button", { hasText: label }).first().click();
   }
@@ -312,6 +314,10 @@ await step("saving creates revision 2 and the viewer shows the saved geometry", 
   await page.getByRole("button", { name: "Save revision" }).click();
   await page.getByText("Saved as revision 2").first().waitFor({ timeout: 20000 });
   await page.waitForFunction(() => !document.querySelector("[data-testid=toggle-before]"), null, { timeout: 15000 });
+  // The pending change clears immediately; the saved parts arrive with the router refresh.
+  await page
+    .waitForFunction((f) => window.__veloxStudio?.fingerprint === f, preview.fingerprint, { timeout: 20000 })
+    .catch(() => {});
   await settle();
   const after = await studioState();
   assert(after.fingerprint === preview.fingerprint, "saved assembly differs from the previewed one");
