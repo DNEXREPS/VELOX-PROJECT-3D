@@ -143,6 +143,29 @@ The attachment rules are the existing velox-assembly/1 rules; nothing in the eng
 
 The studio E2E, the real-Supabase suites and WebKit could not run locally (no Docker, no WebKit). They ran in CI; results below.
 
+### CI results after the MTB expansion: run 44638381379 on `c861268`: all jobs pass
+
+| Job / step | Result |
+|---|---|
+| Typecheck, lint, unit tests (206), asset reproducibility, build | pass |
+| Migrations + RLS + hardening (Postgres 16) with the 71-component seed | pass |
+| Real local Supabase: RLS/hardening; engine off and on: journey and security E2E | pass |
+| Assembly lab, Chromium (static and Supabase-hosted assets) | pass |
+| Studio E2E (17 checks incl. 4 MTB steps): Chromium desktop, Linux WebKit desktop, iPhone 15 emulation, iPad Pro 11 emulation | pass on all four |
+| Assembly lab on macOS WebKit (13 checks incl. the MTB fork asset): desktop, iPhone 15, iPad Pro 11 emulation | pass on all three |
+
+**Runs on the way to green.** These failures were all in tests or infrastructure; the application code did not change between them.
+
+- **Run 44626102156** (iPhone 15 emulation, 14/17):
+  - the open part sheet intercepted the Parts button;
+  - diagnostics (Playwright call log and screenshot on failure) were added.
+- **Run 44630689895** (iPhone 15, 16/17; iPad, 16/17):
+  - **iPhone 15:** the same sheet overlap;
+  - **iPad:** a race in the road save step, which compared fingerprints before the router refresh delivered the saved parts; it now waits for them.
+- **Run 44634567208:**
+  - **iPhone 15 studio (14/17):** the sheet also covered the viewer's 2D and "Show saved" buttons. The test now scrolls to the top first, as a rider would.
+  - **macOS lab, iPad emulation (11/13):** the no-WebAssembly and KTX2 steps timed out because the canvas never reported a render state. This is the only failure seen on that lab code, which passed on all three devices in the runs before and after. It is treated as a runner/WebGL flake and is listed under Limitations.
+
 ### CI results: run 44527754752 on `845aef7` (all P1 code; later commits are documentation only)
 
 | Job / step | Result |
@@ -224,6 +247,11 @@ Other notes:
   - The carbon drop bar lacks drop, and the flared bar lacks reach and drop, so both show "needs verification".
   - The rim-brake wheelset has no rotor mount, so its rotors are unavailable.
 - **MTB demo parts:** added (see "MTB hardtail demo expansion"). They are fictional demo data, and suspension is not modelled.
+- **Short phone screens (pre-existing studio layout, found by the iPhone 15 emulation):**
+  - while a part is selected, the part sheet (up to 60% of the screen height) covers the "Parts" button and the viewer's toolbar (2D, Show saved);
+  - riders must scroll up or close the panel first.
+  - Worth a small UX fix later: for example, make the sheet collapsible or move the toolbar.
+- **One macOS WebGL flake:** in run 44634567208 the canvas never initialised for two lab steps on iPad emulation. This was not reproduced in the next run.
 - **Not modelled in P1:** saddle, pedals, derailleurs, brakes/calipers, grips/tape, headset spacers.
   - These slots are listed as not modelled and are never drawn with borrowed geometry.
 - **Display assumptions** (all labelled in the UI):
