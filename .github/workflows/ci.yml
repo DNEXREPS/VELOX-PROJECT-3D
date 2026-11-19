@@ -37,7 +37,7 @@ jobs:
         run: |
           for f in scripts/assets/authors/*.mts; do npx tsx "$f"; done
           npx tsx scripts/assets/pipeline.mts
-          git diff --exit-code -- assets-src public/lab-assets
+          git diff --exit-code -- assets-src public/model-assets
       - run: npm run build
 
   database:

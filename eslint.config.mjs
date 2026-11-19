@@ -14,7 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Vendored third-party build output, kept byte-identical (drift-tested).
     "public/vendor/**",
-    "src/features/lab/vendor/**",
+    "src/features/studio/assembly/vendor/**",
   ]),
 ]);
 

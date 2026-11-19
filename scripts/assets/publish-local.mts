@@ -1,5 +1,5 @@
 /**
- * Publish public/lab-assets to the PUBLIC Supabase Storage bucket `model-assets` of the
+ * Publish public/model-assets to the PUBLIC Supabase Storage bucket `model-assets` of the
  * LOCAL stack (P0 hosting spike). Refuses any non-local project. Files are immutable and
  * content-addressed: existing paths are never overwritten (except the manifest pointer).
  *
@@ -15,7 +15,7 @@ if (!/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(url)) throw new Error("P0: p
 if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is required");
 
 const BUCKET = "model-assets";
-const DIR = join(import.meta.dirname, "..", "..", "public", "lab-assets");
+const DIR = join(import.meta.dirname, "..", "..", "public", "model-assets");
 const sb = createClient(url, key, { auth: { persistSession: false } });
 
 const { data: existing } = await sb.storage.getBucket(BUCKET);

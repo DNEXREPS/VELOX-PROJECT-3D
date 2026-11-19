@@ -3,7 +3,7 @@
  * assets-src/ (procedural author, open-licence download, commissioned model) goes
  * through the same gates. Fails the run on any issue; nothing partial is published.
  *
- *   npx tsx scripts/assets/pipeline.mts [--out public/lab-assets]
+ *   npx tsx scripts/assets/pipeline.mts [--out public/model-assets]
  *
  * Steps per asset:
  *  1. Khronos glTF-Validator (errors fail)
@@ -35,7 +35,7 @@ export const PIPELINE_VERSION = "velox-pipeline/0.1";
 const ROOT = join(import.meta.dirname, "..", "..");
 const SRC = join(ROOT, "assets-src");
 const outArg = process.argv.indexOf("--out");
-const OUT = join(ROOT, outArg > 0 ? process.argv[outArg + 1] : "public/lab-assets");
+const OUT = join(ROOT, outArg > 0 ? process.argv[outArg + 1] : "public/model-assets");
 
 const sha256 = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
 

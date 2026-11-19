@@ -5,6 +5,115 @@
   "assets": [
     {
       "spec": "velox-assembly/1",
+      "key": "fork-demo-carbon-disc",
+      "version": 1,
+      "kind": "fork",
+      "label": "VELOX Demo carbon disc fork (370 mm, 47 mm offset)",
+      "representation": "representative",
+      "categories": [
+        "road"
+      ],
+      "units": "m",
+      "mounts": {
+        "crown_race": {
+          "node": "MNT__crown_race",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0,
+              0,
+              0
+            ],
+            "r": [
+              -0.5,
+              -0.5,
+              0.5,
+              -0.5
+            ]
+          },
+          "standard": "tapered_1.125_1.5"
+        }
+      },
+      "anchors": {
+        "steerer": {
+          "node": "ANC__steerer",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0,
+              0.3,
+              0
+            ],
+            "r": [
+              0.5,
+              0.5,
+              0.5,
+              -0.5
+            ]
+          }
+        },
+        "front_axle": {
+          "node": "ANC__front_axle",
+          "type": "axle",
+          "pose": {
+            "t": [
+              0.047,
+              -0.37,
+              0
+            ],
+            "r": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "standard": "12x100"
+        },
+        "front_brake": {
+          "node": "ANC__front_brake",
+          "type": "face",
+          "pose": {
+            "t": [
+              0.017,
+              -0.31,
+              -0.05
+            ],
+            "r": [
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          "standard": "flat_mount_140"
+        }
+      },
+      "measured": {
+        "axle_to_crown_mm": 370,
+        "offset_mm": 47
+      },
+      "materials": {
+        "MAT__paint_secondary": "paint_secondary"
+      },
+      "license": {
+        "id": "LicenseRef-VELOX-demo",
+        "attribution": "VELOX demo asset (fictional fork)"
+      },
+      "author": "VELOX P1 author F",
+      "source": "scripts/assets/authors/forks-demo.mts",
+      "demo": true,
+      "file": "models/fork/fork-demo-carbon-disc/1-ab589628b104.glb",
+      "sha256": "ab589628b104d207cdc5267968e9d868a95548f67104ee31e9496cb5399a94b8",
+      "bytes": 7480,
+      "triangles": 204,
+      "geometryFingerprint": "2cfce393419137bb",
+      "compression": "meshopt",
+      "textures": [],
+      "pipeline": "velox-pipeline/0.1"
+    },
+    {
+      "spec": "velox-assembly/1",
       "key": "fork-gravel-demo",
       "version": 1,
       "kind": "fork",

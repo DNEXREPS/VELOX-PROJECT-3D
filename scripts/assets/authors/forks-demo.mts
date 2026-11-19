@@ -24,6 +24,9 @@ interface ForkSpec {
 const forks: ForkSpec[] = [
   { key: "fork-road-demo", label: "VELOX Demo road fork (carbon, 370 mm)", author: "VELOX P0 author C", a2c: 370, offset: 45, axle: "12x100", steerer: "tapered_1.125_1.5", width: 0.1, categories: ["road"], color: "#20232a" },
   { key: "fork-gravel-demo", label: "VELOX Demo gravel fork (carbon, 395 mm)", author: "VELOX P0 author D", a2c: 395, offset: 50, axle: "12x100", steerer: "tapered_1.125_1.5", width: 0.11, categories: ["gravel", "road"], color: "#3a3f47" },
+  // P1: representative model built to the RECORDED geometry of demo catalog fork
+  // "demo-carbon-disc-fork" (axle-to-crown 370 mm, offset 47 mm, 12x100, tapered).
+  { key: "fork-demo-carbon-disc", label: "VELOX Demo carbon disc fork (370 mm, 47 mm offset)", author: "VELOX P1 author F", a2c: 370, offset: 47, axle: "12x100", steerer: "tapered_1.125_1.5", width: 0.1, categories: ["road"], color: "#1f2228" },
   { key: "fork-mtb-rigid-demo", label: 'VELOX Demo 29" rigid MTB fork (470 mm)', author: "VELOX P0 author E", a2c: 470, offset: 44, axle: "15x110_boost", steerer: "zs44_ec49", width: 0.13, categories: ["mtb_hardtail"], color: "#4d4f52" },
 ];
 

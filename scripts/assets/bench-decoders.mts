@@ -9,7 +9,7 @@ import { Document, NodeIO, Logger } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { meshopt, quantize, weld } from "@gltf-transform/functions";
 import { MeshoptDecoder, MeshoptEncoder } from "meshoptimizer";
-import { MeshoptDecoder as Reference } from "../../src/features/lab/vendor/meshopt_decoder_reference.js";
+import { MeshoptDecoder as Reference } from "../../src/features/studio/assembly/vendor/meshopt_decoder_reference.js";
 
 await MeshoptEncoder.ready;
 await MeshoptDecoder.ready;
