@@ -136,6 +136,22 @@ async function selectSlot(label) {
   }
   await page.getByRole("button", { name: /^(Add part|Replace part)$/ }).waitFor({ timeout: 10000 });
 }
+/**
+ * Viewer toolbar buttons (2D, Show saved) sit at the top of the viewer. On short phones the open
+ * part sheet covers the lower ~60% of the screen, so scroll the page to the top first, as a rider
+ * would, instead of letting the browser scroll the button just into view under the sheet.
+ */
+async function tapViewer(testId) {
+  if (desktop()) return page.getByTestId(testId).click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  try {
+    await page.getByTestId(testId).click({ timeout: 4000 });
+  } catch {
+    // Still under the sheet (very short screens): close the panel, as a rider would.
+    await closePanel();
+    await page.getByTestId(testId).click();
+  }
+}
 /** Phones/tablets: the part sheet covers the pending-changes bar; close it like a user would. */
 async function closePanel() {
   if (desktop()) return;
@@ -271,11 +287,11 @@ await step("replacing the stem (UI picker) regenerates it, moves the handlebar a
   // The stem's 35 mm clamp vs the 31.8 mm bar is reported, not hidden.
   const barWarnings = after.nodes.find((n) => n.id === "handlebar").warnings;
   assert(barWarnings.some((w) => w.startsWith("interface_mismatch:bar_clamp")), `clamp mismatch not reported: ${barWarnings}`);
-  await page.getByTestId("toggle-before").click();
+  await tapViewer("toggle-before");
   await changedFrom(after.fingerprint);
   const saved = await studioState();
   assert(saved.showingBefore && saved.fingerprint === before.fingerprint, "Show saved did not restore the saved assembly");
-  await page.getByTestId("toggle-before").click();
+  await tapViewer("toggle-before");
   await changedFrom(before.fingerprint);
 });
 
@@ -291,12 +307,12 @@ await step("a bar without recorded drop shows 'needs verification' and no stale 
 });
 
 await step("2D side view is drawn from the same assembly and is interactive", async () => {
-  await page.getByTestId("toggle-2d").click();
+  await tapViewer("toggle-2d");
   const svg = page.getByTestId("assembly-2d");
   await svg.waitFor();
   assert((await svg.locator("polyline").count()) >= 6, "2D polylines missing");
   assert((await studioState()).mode === "2d", "mode not 2d");
-  await page.getByTestId("toggle-2d").click();
+  await tapViewer("toggle-2d");
   await page.getByTestId("assembly-canvas").waitFor();
   await settle();
 });
@@ -402,19 +418,19 @@ await step("MTB: replacing fork, flat bar, stem, crankset, cassette, chain and r
     if (id === "crankset") assert(b.nodes.find((n) => n.id === "chain").sig !== a.nodes.find((n) => n.id === "chain").sig, "chain did not follow the new chainring");
   }
   // 2D is drawn from the same (previewed) assembly.
-  await page.getByTestId("toggle-2d").click();
+  await tapViewer("toggle-2d");
   await page.getByTestId("assembly-2d").waitFor();
   assert((await page.locator("[data-testid=assembly-2d] [data-node=fork]").count()) > 0, "2D fork missing");
-  await page.getByTestId("toggle-2d").click();
+  await tapViewer("toggle-2d");
   await page.getByTestId("assembly-canvas").waitFor();
   await settle();
   // Before/after against the saved MTB build.
   const preview = await studioState();
-  await page.getByTestId("toggle-before").click();
+  await tapViewer("toggle-before");
   await changedFrom(preview.fingerprint);
   const saved = await studioState();
   assert(saved.showingBefore, "Show saved did not switch");
-  await page.getByTestId("toggle-before").click();
+  await tapViewer("toggle-before");
   await changedFrom(saved.fingerprint);
   await closePanel();
   await page.getByRole("button", { name: "Cancel all" }).click();
