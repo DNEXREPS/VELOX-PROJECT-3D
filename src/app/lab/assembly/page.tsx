@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -15,6 +16,10 @@ export const metadata: Metadata = { title: "Assembly lab (P0)", robots: { index:
  * Supabase project). `?csp=no-wasm` simulates browsers without WebAssembly CSP support.
  */
 export default async function AssemblyLabPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  // Request-time rendering is required: the lab flag is a RUNTIME setting, and the CSP
+  // nonce can only be applied to dynamically rendered pages. Without this, a build with no
+  // Supabase variables prerenders the page (P0 CI finding).
+  await connection();
   if (process.env.VELOX_LABS !== "1") notFound();
   const params = await searchParams;
   const source = params.source === "supabase" ? "supabase" : "static";
