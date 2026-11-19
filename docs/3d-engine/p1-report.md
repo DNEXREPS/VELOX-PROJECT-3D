@@ -47,28 +47,38 @@ The resolver compared the stem's steerer clamp (28.6) with the frame's **headset
 
 ### Not runnable here
 
-The studio E2E, the real-Supabase suites and WebKit could not run locally (no Docker, no WebKit). They run in CI. Results: see "CI" below.
+The studio E2E, the real-Supabase suites and WebKit could not run locally (no Docker, no WebKit). They ran in CI; results below.
 
-### CI matrix (`.github/workflows/ci.yml`)
+### CI results: run 44527754752 on `845aef7` (all P1 code; later commits are documentation only)
 
-**`quality` job:** typecheck, lint, unit, asset determinism, build.
+| Job / step | Result |
+|---|---|
+| Typecheck, lint, unit tests, asset reproducibility, build (no Supabase env) | pass |
+| Migrations + RLS + hardening (Postgres 16 shim) | pass |
+| Real local Supabase: RLS and hardening suites | pass |
+| Engine **off**: journey | pass (16/16 in every run of this job) |
+| Engine **off**: security E2E | pass (16/16) |
+| Engine **off**: assembly lab, Chromium, static and Supabase-hosted assets | pass |
+| Engine **on**: journey | pass (16/16) |
+| Engine **on**: security E2E (includes CSP on the modular studio) | pass (16/16) |
+| Studio E2E, Chromium desktop | **13/13** |
+| Studio E2E, Linux WebKit 26.6, desktop | **13/13** |
+| Studio E2E, Linux WebKit, iPhone 15 emulation | **13/13** |
+| Studio E2E, Linux WebKit, iPad Pro 11 emulation | **13/13** |
+| Assembly lab on macOS WebKit (desktop, iPhone 15, iPad Pro 11 emulation) | **not run in this run** (see below) |
 
-**`database` job:** migrations, RLS and hardening on Postgres 16.
+**The macOS job.**
+- In the last two runs it was cancelled after 15 minutes without being assigned a macOS runner. That is runner availability, not a test result.
+- Its most recent real run (run 44513820095, commit `83ab281`) passed on WebKit desktop, iPhone 15 emulation and iPad Pro 11 emulation.
+- Since `83ab281`, the only changes are E2E test files, CI configuration and documentation. No application or lab code changed.
 
-**`supabase-e2e` job** (real local Supabase), in two phases.
-
-Flag off:
-- journey
-- security E2E
-- lab, Chromium, static and Supabase-hosted assets
-
-Then rebuilt with `NEXT_PUBLIC_ASSEMBLY_ENGINE=1`:
-- journey
-- security E2E (CSP on the studio, with the engine on)
-- studio E2E on Chromium desktop
-- studio E2E on **Linux WebKit**: desktop, iPhone 15 emulation and iPad Pro 11 emulation
-
-**`webkit-devices` job** (macOS WebKit): lab E2E on desktop, iPhone 15 emulation and iPad Pro 11 emulation.
+**Failures found and fixed on the way to green:**
+- **Engine-on security E2E:** it expected the classic viewer's canvas on the studio page. It now expects the modular canvas when the engine is on, and the CSP assertions are unchanged.
+- **Studio E2E, empty mountain bike:** the test waited for the wrong text. The UI was correct, which I verified with a local harness that rendered the real studio component.
+- **Studio E2E on phone/tablet layouts:** the part sheet covers the pending-changes bar, so the test now closes the panel first, as a rider would. This layout behaviour predates P1.
+  - Follow-up worth considering: make "Save revision" reachable while the sheet is open.
+- **WebKit page errors:** WebKit reports same-origin fetches cancelled by navigation (RSC prefetches, the classic GLB) as page errors "due to access control checks". Only that message, for same-origin addresses, is ignored.
+- **CI infrastructure:** a stalled Playwright browser download is now retried (three bounded attempts). The engine-on steps run only when the engine server actually started.
 
 ### What "WebKit" means here
 
@@ -163,4 +173,4 @@ Run on real hardware with the engine flag on: Safari macOS 15+, an iPhone (A15 o
 
 ## CI
 
-Run `44513620868` on commit `24d040c` (pending when this report was written; see the final summary).
+See "CI results" above: run 44527754752 on `845aef7`. Every job passed except the macOS lab job, which was not run because no runner was assigned. Its last run, on `83ab281`, passed.
