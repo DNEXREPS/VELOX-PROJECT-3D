@@ -76,5 +76,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|models/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|glb|gltf)$).*)"],
+  // api/monitoring: anonymous beacons need no session; skipping the proxy means they can
+  // never be used to generate Supabase Auth traffic.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|models/|api/monitoring/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|glb|gltf)$).*)"],
 };

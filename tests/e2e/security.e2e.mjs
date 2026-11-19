@@ -287,8 +287,10 @@ await step("client error beacon: same-origin only, validated, scrubbed into the 
   assert(ok === 204, `same-origin report returned ${ok}`);
   const cross = await fetch(`${BASE}/api/monitoring/client-error`, { method: "POST", headers: { origin: "https://evil.example", "content-type": "application/json" }, body: JSON.stringify({ kind: "3d-load", message: "x" }) });
   assert(cross.status === 403, `cross-origin report returned ${cross.status}`);
-  const bad = await page.evaluate(async () => (await fetch("/api/monitoring/client-error", { method: "POST", body: JSON.stringify({ kind: "shell", message: 1 }) })).status);
+  const bad = await page.evaluate(async () => (await fetch("/api/monitoring/client-error", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "shell", message: 1 }) })).status);
   assert(bad === 400, `invalid report returned ${bad}`);
+  const plain = await page.evaluate(async () => (await fetch("/api/monitoring/client-error", { method: "POST", body: "{}" })).status);
+  assert(plain === 415, `non-JSON report returned ${plain}`);
   if (LOG && existsSync(LOG)) {
     const log = readFileSync(LOG, "utf8");
     assert(log.includes('"op":"client.3d-load"'), "event not found in server log");
@@ -331,39 +333,100 @@ await step("3D failures are reported: GLB load failure (2D fallback) and real We
   await p.close();
 });
 
-await step("password reset link (token-hash flow) sets a new password", async () => {
-  const link = await (await fetch(`${SB}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, "content-type": "application/json" }, body: JSON.stringify({ type: "recovery", email: user.email }) })).json();
+const generateLink = async (body) => {
+  const link = await (await fetch(`${SB}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, "content-type": "application/json" }, body: JSON.stringify(body) })).json();
   const hash = link.hashed_token ?? link.properties?.hashed_token;
-  assert(hash, "no hashed_token");
+  assert(hash, `no hashed_token: ${JSON.stringify(link).slice(0, 120)}`);
+  return hash;
+};
+
+await step("password reset: mail-scanner GETs cannot consume the link; the button redeems it once", async () => {
+  const hash = await generateLink({ type: "recovery", email: user.email });
+  const confirmUrl = `${BASE}/auth/confirm?token_hash=${hash}&type=recovery`;
+
+  // Scanner simulation: several anonymous GETs of the link, including the legacy callback form.
+  for (const url of [confirmUrl, confirmUrl, `${BASE}/auth/callback?token_hash=${hash}&type=recovery`]) {
+    const r = await fetch(url, { redirect: "follow", headers: { "user-agent": "Mozilla/5.0 (compatible; SafeLinks-Scanner)" } });
+    assert(r.status === 200 && r.url.includes("/auth/confirm"), `scanner GET ended at ${r.status} ${r.url}`);
+    assert(!r.headers.get("set-cookie")?.includes("auth-token"), "a GET created a session");
+  }
+  const page1 = await (await fetch(confirmUrl)).text();
+  assert(page1.includes("Continue to reset password"), "confirm page does not ask for an explicit action");
+
+  // The person opens the (legacy) link: forwarded to the confirm page, presses the button.
   const fresh = await browser.newContext();
   const p = await fresh.newPage();
   await p.goto(`${BASE}/auth/callback?token_hash=${hash}&type=recovery`);
+  await p.waitForURL(/\/auth\/confirm\?/, { timeout: 15000 });
+  await p.getByRole("button", { name: "Continue to reset password" }).click();
   await p.waitForURL("**/reset-password", { timeout: 15000 });
   await p.fill("#password", "velox-new-2026x");
   await p.fill("#confirmPassword", "velox-new-2026x");
   await p.click("button[type=submit]");
   await p.getByText("Password updated").first().waitFor({ timeout: 10000 });
   await fresh.close();
-  // A recovery link works once.
+
+  // A redeemed link cannot be used again.
   const other = await browser.newContext();
   const reused = await other.newPage();
-  await reused.goto(`${BASE}/auth/callback?token_hash=${hash}&type=recovery`);
+  await reused.goto(confirmUrl);
+  await reused.getByRole("button", { name: "Continue to reset password" }).click();
   await reused.waitForURL(/\/login\?error=callback/, { timeout: 15000 });
   await other.close();
   const login = await fetch(`${SB}/auth/v1/token?grant_type=password`, { method: "POST", headers: { apikey: ANON, "content-type": "application/json" }, body: JSON.stringify({ email: user.email, password: "velox-new-2026x" }) });
   assert(login.ok, "new password does not work");
 });
 
-await step("sign-up confirmation link (token-hash flow) signs the rider in", async () => {
+await step("sign-up confirmation: survives scanner GETs, the button signs the rider in", async () => {
   const email = `confirm_${stamp}@example.test`;
-  const link = await (await fetch(`${SB}/auth/v1/admin/generate_link`, { method: "POST", headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, "content-type": "application/json" }, body: JSON.stringify({ type: "signup", email, password: "velox-conf-2026", data: { username: `conf_${stamp}` } }) })).json();
-  const hash = link.hashed_token ?? link.properties?.hashed_token;
-  assert(hash, `no hashed_token: ${JSON.stringify(link).slice(0, 120)}`);
+  const hash = await generateLink({ type: "signup", email, password: "velox-conf-2026", data: { username: `conf_${stamp}` } });
+  const url = `${BASE}/auth/confirm?token_hash=${hash}&type=email&next=/dashboard`;
+  for (let i = 0; i < 2; i++) assert((await fetch(url)).status === 200, "scanner GET failed");
   const fresh = await browser.newContext();
   const p = await fresh.newPage();
-  await p.goto(`${BASE}/auth/callback?token_hash=${hash}&type=email&next=/dashboard`);
+  await p.goto(url);
+  await p.getByRole("button", { name: "Confirm e-mail address" }).click();
   await p.waitForURL("**/dashboard", { timeout: 15000 });
   await fresh.close();
+});
+
+await step("confirmation tokens cannot be redeemed by a cross-site POST", async () => {
+  const hash = await generateLink({ type: "recovery", email: user.email });
+  // Find the Server Action id rendered into the confirm form, then replay it from another origin.
+  const html = await (await fetch(`${BASE}/auth/confirm?token_hash=${hash}&type=recovery`)).text();
+  const actionId = /name="\$ACTION_ID_([0-9a-f]+)"/.exec(html)?.[1];
+  assert(actionId, "server action id not found in form");
+  const form = new FormData();
+  form.set(`$ACTION_ID_${actionId}`, "");
+  form.set("token_hash", hash);
+  form.set("type", "recovery");
+  const r = await fetch(`${BASE}/auth/confirm`, { method: "POST", body: form, redirect: "manual", headers: { origin: "https://evil.example" } });
+  assert(!r.headers.get("set-cookie")?.includes("auth-token"), `cross-site POST created a session (status ${r.status})`);
+  // The token is still valid for the real user afterwards.
+  const fresh = await browser.newContext();
+  const p = await fresh.newPage();
+  await p.goto(`${BASE}/auth/confirm?token_hash=${hash}&type=recovery`);
+  await p.getByRole("button", { name: "Continue to reset password" }).click();
+  await p.waitForURL("**/reset-password", { timeout: 15000 });
+  await fresh.close();
+});
+
+await step("client error intake: a flooding client is cut off with 429 (runs last: it exhausts the budget)", async () => {
+  const statuses = [];
+  for (let i = 0; i < 15; i++) {
+    const r = await fetch(`${BASE}/api/monitoring/client-error`, {
+      method: "POST",
+      headers: { origin: BASE, "content-type": "application/json" },
+      body: JSON.stringify({ kind: "render", message: `flood ${stamp} ${i}` }),
+    });
+    statuses.push(r.status);
+  }
+  assert(statuses.includes(429), `no 429 in ${statuses}`);
+  assert(statuses.slice(statuses.indexOf(429)).every((s) => s === 429), `limit not sticky: ${statuses}`);
+  if (LOG && existsSync(LOG)) {
+    const logged = readFileSync(LOG, "utf8").split("\n").filter((l) => l.includes(`flood ${stamp}`)).length;
+    assert(logged <= 10, `${logged} flood reports were logged`);
+  }
 });
 
 await browser.close();

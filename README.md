@@ -54,11 +54,12 @@ Validate a configuration without printing secrets: `npm run env:check -- --targe
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm run typecheck` · `npm run lint` | `tsc --noEmit` · ESLint |
 | `npm test` | Unit tests (compatibility, analytics, maintenance, revisions, validation, uploads, 3D asset mapping, schema sync) |
-| `npm run db:local` then `DATABASE_URL=… npm run test:db` | Throwaway Postgres 16 + Supabase shim → migrations + seed → RLS/ownership/integrity suite |
+| `npm run db:local` then `DATABASE_URL=… npm run test:db` | Throwaway Postgres 16 + Supabase shim → migrations + seed → RLS/ownership/integrity + hardening suites. Fails (never skips) without `DATABASE_URL` |
 | `npm run test:e2e -- [baseUrl]` | Playwright end-to-end journey against a running app + local Supabase |
 | `npm run test:e2e:security -- [baseUrl]` | Security E2E (CSP, uploads, storage cleanup, rate limits, monitoring, auth links); needs local stack env vars, see file header |
 | `npm run env:check` | Validate deployment environment variables |
 | `npm run db:push:dry` | Show which migrations `supabase db push` would apply to the linked project |
+| `npm run db:checksums` | Record the checksum of a NEW migration (applied migrations are immutable; enforced by a unit test) |
 | `npm run check` | typecheck + lint + unit tests + production build |
 | `npm run db:seed:build` | Regenerate `supabase/seed.sql` from `supabase/catalog/*.json` |
 | `npm run catalog:import -- file.json` | Import a real, sourced catalogue (service role) |

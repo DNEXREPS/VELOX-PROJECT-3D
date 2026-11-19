@@ -9,9 +9,10 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+import { requireDatabaseUrl } from "./database-url";
 
-const url = process.env.DATABASE_URL;
-const d = url ? describe : describe.skip;
+const url = requireDatabaseUrl();
+const d = describe;
 
 const CAROL = "d0000000-0000-4000-8000-00000000000d";
 const DAVE = "e0000000-0000-4000-8000-00000000000e";

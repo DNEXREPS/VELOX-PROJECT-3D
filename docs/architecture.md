@@ -86,7 +86,15 @@ Public read models (views): `bicycle_passports`, `passport_components`, `passpor
     - The header is parsed for pixel dimensions; images over 8000 px per side or 40 MP are rejected (decompression-bomb protection).
     - Avatars are served by public URL, but the bucket can no longer be listed anonymously.
     - Component image URLs must be `https` (or site-relative) and are rendered only from allow-listed hosts, with `referrerpolicy=no-referrer`.
-13. Open-redirect protection on `next` parameters.
+13. **Auth e-mail links** go to `/auth/confirm`, which only renders a button. The one-time token is redeemed by a POST Server Action (same-origin checked by Next.js), so mail scanners that pre-fetch links cannot consume reset or confirmation tokens. Legacy `/auth/callback?token_hash=…` links are forwarded there without redeeming anything. A static test asserts that `verifyOtp` is only called from that action.
+14. **Anonymous client-error intake** (`/api/monitoring/client-error`), in order:
+    - It is excluded from the proxy, so it never calls Supabase Auth.
+    - Same-origin signals, a JSON content type, a 2 KB cap read as a stream, and a strict schema (known kinds and model keys only).
+    - Per-instance limits: per client (salted in-memory hash of the address, never logged or stored), per identical report, and a global log-line budget.
+
+    A Vercel Firewall rule is recommended for a hard cross-instance limit.
+15. **Migrations are immutable and additive.** `supabase/migration-checksums.json` pins every applied migration, and a unit test fails on any edit. Another unit test rejects destructive statements.
+16. Open-redirect protection on `next` parameters.
 
 Verified by:
 - `tests/db/rls.test.ts` (26 cases) and `tests/db/hardening.test.ts` (22 cases), against both a vanilla Postgres 16 + shim and the real Supabase local stack.
@@ -143,4 +151,6 @@ Matching categories never imply compatibility. Manufacturer-specific logic can b
 - **Image processing** (resizing/thumbnails) is not implemented; originals ≤ 5 MB are served via signed URLs.
 - **CSP `style-src` allows `'unsafe-inline'`** (inline `style` attributes from React/Radix/Recharts cannot carry nonces). Script execution remains strictly nonce-based.
 - **Orphan sweep**: uploads whose database row was never written are removed when their folder is deleted, or when compensation is queued. There is no periodic reconciliation of storage against tables.
+- **Client-error intake limits are per instance** (serverless): the cross-instance bound is the recommended Vercel Firewall rule, not app code.
+- **Mail scanners that execute JavaScript and submit forms** could still redeem a link; this is rare, and the token is single-use and expires after one hour.
 - **Monitoring** has no alerting until a Log Drain or `MONITORING_WEBHOOK_URL` is configured (see `docs/deployment/staging.md`).

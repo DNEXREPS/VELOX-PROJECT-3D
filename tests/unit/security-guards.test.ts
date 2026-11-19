@@ -4,6 +4,7 @@
  * the service-role key reaching browser code, or a destructive migration.
  */
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
@@ -24,7 +25,7 @@ const sourceFiles = walk("src");
 describe("server actions", () => {
   const actionFiles = readdirSync(join(ROOT, "src/server/actions")).map((f) => `src/server/actions/${f}`);
   // Auth actions establish the session themselves (sign in / sign up / reset).
-  const PUBLIC_ACTIONS = new Set(["signIn", "signUp", "signOut", "requestPasswordReset", "updatePassword"]);
+  const PUBLIC_ACTIONS = new Set(["signIn", "signUp", "signOut", "requestPasswordReset", "updatePassword", "confirmEmailLink"]);
 
   it("every exported action authenticates the caller via the server session", () => {
     const missing: string[] = [];
@@ -46,6 +47,31 @@ describe("server actions", () => {
       const src = read(file);
       expect(src, file).not.toMatch(/formData\.get\(["'](user_?id|owner_?id|author_?id|reporter_?id)["']\)/i);
       expect(src, file).not.toMatch(/input\.(userId|ownerId|authorId)/);
+    }
+  });
+});
+
+describe("auth e-mail links", () => {
+  it("one-time tokens are only redeemed by the POST-only Server Action, never on a GET route or page", () => {
+    const redeemers = sourceFiles.filter((f) => /\.verifyOtp\(/.test(read(f)));
+    expect(redeemers).toEqual(["src/server/actions/auth.ts"]);
+  });
+
+  it("e-mail templates link to the confirmation page, not to a GET endpoint that redeems tokens", () => {
+    for (const t of readdirSync(join(ROOT, "supabase/templates"))) {
+      const html = read(`supabase/templates/${t}`);
+      expect(html, t).toContain("/auth/confirm?token_hash={{ .TokenHash }}");
+      expect(html, t).not.toMatch(/ConfirmationURL|\/auth\/callback|\/auth\/v1\/verify/);
+    }
+  });
+});
+
+describe("database test suites", () => {
+  it("fail closed: they never skip when DATABASE_URL is missing", () => {
+    for (const f of readdirSync(join(ROOT, "tests/db")).filter((n) => n.endsWith(".test.ts"))) {
+      const src = read(`tests/db/${f}`);
+      expect(src, f).toContain("requireDatabaseUrl()");
+      expect(src, f).not.toMatch(/describe\.skip|\.skipIf\(|it\.skip|test\.skip/);
     }
   });
 });
@@ -92,6 +118,14 @@ describe("migrations", () => {
       for (const re of destructive) if (re.test(sql)) hits.push(`${f}: ${re}`);
     }
     expect(hits).toEqual([]);
+  });
+
+  it("are immutable once recorded: every migration matches supabase/migration-checksums.json", () => {
+    const manifest = JSON.parse(read("supabase/migration-checksums.json")) as Record<string, string>;
+    const sha = (f: string) => createHash("sha256").update(readFileSync(join(ROOT, "supabase/migrations", f))).digest("hex");
+    expect(Object.keys(manifest).sort(), "run `npm run db:checksums` after adding a migration").toEqual(files);
+    const modified = files.filter((f) => manifest[f] !== sha(f));
+    expect(modified, "applied migrations must not be edited; add a new migration instead").toEqual([]);
   });
 
   it("use monotonically increasing, unique timestamps", () => {
