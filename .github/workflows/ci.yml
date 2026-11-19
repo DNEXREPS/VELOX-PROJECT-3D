@@ -33,7 +33,10 @@ jobs:
       # Includes static security guards (server-action auth, service-role isolation,
       # additive-only migrations) in tests/unit/security-guards.test.ts.
       - run: npm test
+      # Built WITHOUT Supabase variables: the case where pages used to become static.
       - run: npm run build
+      - name: No HTML route is prerendered static under the nonce CSP
+        run: npm run check:static-routes
 
   database:
     name: Migrations + RLS integration tests (Postgres 16)
@@ -104,6 +107,7 @@ jobs:
       - name: Build and start the production server
         run: |
           npm run build
+          npm run check:static-routes
           nohup npm start > "$SERVER_LOG" 2>&1 &
           for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/ && exit 0; sleep 1; done
           echo "server did not start"; cat "$SERVER_LOG"; exit 1
