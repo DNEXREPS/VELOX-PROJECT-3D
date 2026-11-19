@@ -151,14 +151,17 @@ jobs:
           npm install --no-save playwright@${PLAYWRIGHT_VERSION}
           npx playwright install webkit
       - name: Build and start (labs enabled, no backend needed)
+        # Dedicated port on 127.0.0.1: on the macOS runner another process answered on localhost:3000.
         run: |
           npm run build
-          VELOX_LABS=1 nohup npm start > "${RUNNER_TEMP}/next.log" 2>&1 &
-          for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/lab/assembly && exit 0; sleep 1; done
+          VELOX_LABS=1 nohup npx next start -H 127.0.0.1 -p 3107 > "${RUNNER_TEMP}/next.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://127.0.0.1:3107/lab/assembly && exit 0; sleep 1; done
+          curl -sS -i http://127.0.0.1:3107/lab/assembly | head -20 || true
+          lsof -nP -iTCP -sTCP:LISTEN | head -30 || true
           cat "${RUNNER_TEMP}/next.log"; exit 1
       - name: WebKit desktop
-        run: E2E_BROWSER=webkit node tests/e2e/assembly-lab.e2e.mjs http://localhost:3000
+        run: E2E_BROWSER=webkit node tests/e2e/assembly-lab.e2e.mjs http://127.0.0.1:3107
       - name: WebKit · iPhone 15 emulation
-        run: E2E_BROWSER=webkit E2E_DEVICE="iPhone 15" node tests/e2e/assembly-lab.e2e.mjs http://localhost:3000
+        run: E2E_BROWSER=webkit E2E_DEVICE="iPhone 15" node tests/e2e/assembly-lab.e2e.mjs http://127.0.0.1:3107
       - name: WebKit · iPad Pro 11 emulation
-        run: E2E_BROWSER=webkit E2E_DEVICE="iPad Pro 11" node tests/e2e/assembly-lab.e2e.mjs http://localhost:3000
+        run: E2E_BROWSER=webkit E2E_DEVICE="iPad Pro 11" node tests/e2e/assembly-lab.e2e.mjs http://127.0.0.1:3107
