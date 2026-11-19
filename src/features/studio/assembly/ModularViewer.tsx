@@ -73,7 +73,7 @@ export function ModularViewer(props: ModularViewerProps) {
       showingBefore: shown === savedSpec && showBefore,
       fingerprint: shown.fingerprint,
       derived: shown.derived,
-      nodes: shown.nodes.map((n) => ({ id: n.id, slot: n.slot, status: n.status, representation: n.representation, missing: n.missing, sig: n.status === "ok" ? n.source && (n.source.kind === "asset" ? `asset:${n.source.key}@${n.source.version}:${n.source.sha256.slice(0, 12)}` : `gen:${n.source.generator}@${n.source.version}:${n.source.variant ?? ""}:${JSON.stringify(n.source.params)}`) : null })),
+      nodes: shown.nodes.map((n) => ({ id: n.id, slot: n.slot, status: n.status, representation: n.representation, missing: n.missing, warnings: n.warnings, sig: n.status === "ok" ? n.source && (n.source.kind === "asset" ? `asset:${n.source.key}@${n.source.version}:${n.source.sha256.slice(0, 12)}` : `gen:${n.source.generator}@${n.source.version}:${n.source.variant ?? ""}:${JSON.stringify(n.source.params)}`) : null })),
       render,
     };
   }, [shown, savedSpec, showBefore, render, viewMode]);
