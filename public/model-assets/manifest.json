@@ -114,6 +114,115 @@
     },
     {
       "spec": "velox-assembly/1",
+      "key": "fork-demo-mtb-480",
+      "version": 1,
+      "kind": "fork",
+      "label": "VELOX Demo 29\" rigid MTB fork (480 mm, 51 mm offset)",
+      "representation": "representative",
+      "categories": [
+        "mtb_hardtail"
+      ],
+      "units": "m",
+      "mounts": {
+        "crown_race": {
+          "node": "MNT__crown_race",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0,
+              0,
+              0
+            ],
+            "r": [
+              -0.5,
+              -0.5,
+              0.5,
+              -0.5
+            ]
+          },
+          "standard": "zs44_ec49"
+        }
+      },
+      "anchors": {
+        "steerer": {
+          "node": "ANC__steerer",
+          "type": "tube",
+          "pose": {
+            "t": [
+              0,
+              0.3,
+              0
+            ],
+            "r": [
+              0.5,
+              0.5,
+              0.5,
+              -0.5
+            ]
+          }
+        },
+        "front_axle": {
+          "node": "ANC__front_axle",
+          "type": "axle",
+          "pose": {
+            "t": [
+              0.051,
+              -0.48,
+              0
+            ],
+            "r": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "standard": "15x110_boost"
+        },
+        "front_brake": {
+          "node": "ANC__front_brake",
+          "type": "face",
+          "pose": {
+            "t": [
+              0.020999999999999998,
+              -0.42,
+              -0.065
+            ],
+            "r": [
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          "standard": "flat_mount_140"
+        }
+      },
+      "measured": {
+        "axle_to_crown_mm": 480,
+        "offset_mm": 51
+      },
+      "materials": {
+        "MAT__paint_secondary": "paint_secondary"
+      },
+      "license": {
+        "id": "LicenseRef-VELOX-demo",
+        "attribution": "VELOX demo asset (fictional fork)"
+      },
+      "author": "VELOX P1 author G",
+      "source": "scripts/assets/authors/forks-demo.mts",
+      "demo": true,
+      "file": "models/fork/fork-demo-mtb-480/1-6cc07e322523.glb",
+      "sha256": "6cc07e3225237da7caee84c67d7760f9f31e45683742fade1dc016267354e6c1",
+      "bytes": 7488,
+      "triangles": 204,
+      "geometryFingerprint": "b9c29bfca0447cbb",
+      "compression": "meshopt",
+      "textures": [],
+      "pipeline": "velox-pipeline/0.1"
+    },
+    {
+      "spec": "velox-assembly/1",
       "key": "fork-gravel-demo",
       "version": 1,
       "kind": "fork",

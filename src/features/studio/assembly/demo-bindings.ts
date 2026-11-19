@@ -52,6 +52,28 @@ export const DEMO_VISUAL_LINKS: Record<string, VisualBinding> = {
   "demo-rotor-160-centerlock": gen("rotor"),
   "demo-rotor-140-centerlock": gen("rotor"),
   "demo-rotor-180-6bolt": gen("rotor"),
+
+  // ---- MTB hardtail demo (P1) ----
+  // Frame: representative hardtail model; this frame has no recorded geometry chart.
+  "demo-trail-hardtail-alloy-frame": asset("frame-hardtail-demo", false),
+  // Forks: models built to each fork's recorded axle-to-crown and offset.
+  "demo-rigid-mtb-fork-470": asset("fork-mtb-rigid-demo", true),
+  "demo-rigid-mtb-fork-480": asset("fork-demo-mtb-480", true),
+  // "demo-rigid-mtb-fork-unspecified" is deliberately unlinked: no recorded geometry → no 3D model.
+  "demo-29-trail-wheelset": gen("wheel"),
+  "demo-mtb-tire-29x2-4": gen("tire"),
+  "demo-mtb-tire-29x2-2": gen("tire"),
+  "demo-alloy-flat-bar-780": gen("handlebar", "flat"),
+  "demo-carbon-flat-bar-760": gen("handlebar", "flat"),
+  "demo-alloy-riser-bar-unspecified": gen("handlebar", "flat"),
+  "demo-alloy-mtb-stem-50": gen("stem"),
+  "demo-alloy-mtb-stem-70": gen("stem"),
+  "demo-m12-crankset-170-32": gen("crankset"),
+  "demo-m12-crankset-175-30": gen("crankset"),
+  "demo-m12-cassette-10-51-ms": gen("cassette"),
+  "demo-x12-cassette-10-52-xd": gen("cassette"),
+  "demo-m12-chain": gen("chain"),
+  "demo-rotor-203-6bolt": gen("rotor"),
 };
 
 export interface PartLike {
