@@ -177,11 +177,35 @@ These are rejected anywhere in names or extras. `key@version` asset references a
 6. Ground solve (§6.3), then world poses parent-first, then world anchor positions.
 7. Output: nodes, derived values (pitch, BB height, wheelbase), warnings, revision refs (§7), fingerprint.
 
-P1 adds the slots in §4 in the same order: the steering chain, the seat chain, then drivetrain and brakes.
+P1 (implemented) continues in this order:
+
+8. **Stem** (generator). `steerer_clamp` → frame `head_upper`, slid 10 mm up the steerer.
+   - The headset cover and spacer stack are not recorded, so this is a display value (`DISPLAY_FIT`) and is listed as an assumption.
+   - The stem's steerer diameter is compared with the steerer diameter that the frame's headset standard takes (`tapered_1.125_1.5` and `zs44_ec49` both take 28.6). It is not compared with the headset string itself.
+9. **Handlebar** (generator, `drop` or `flat` variant). `clamp` → stem `bar_clamp`.
+   - The roll about the clamp axis is solved so the bar's +Y is world-vertical ("Bar roll not recorded — shown level").
+   - Clamp diameters are compared only when both sides are **recorded**; display defaults are never compared.
+10. **Seatpost** (generator). `insertion` → frame `seat_tube`, inserted min(120 mm, length − 50 mm) and clamped to the anchor's slide range.
+    - Saddle height is fit data and is not recorded, so this is listed.
+11. **Crankset** → frame `bb`. **Cassette** → rear wheel `freehub`.
+12. **Rotors** → the wheel's `rotor` anchor. Only disc-brake wheels declare one; on a rim-brake wheelset the rotors are `host_unavailable` and are never left floating.
+13. **Chain** (derived). It is laid in world space from the largest chainring and the smallest cog actually in the assembly.
+    - Without both of these it is `host_unavailable`.
+14. **Not modelled.** Slots that are not modelled (`notModelled`: saddle, pedals, derailleurs, brakes, …) get no node and are listed explicitly; they never borrow geometry.
+    - Absent slots produce no node.
 
 ### 6.2 Output
 
-`AssemblySpec { spec, category, template, nodes[], derived, warnings[], revision, fingerprint }`.
+`AssemblySpec { spec, category, template, nodes[], derived, derivedQuality, notModelled[], warnings[], revision, fingerprint }`.
+
+**`derived`** holds these values, all relative to the BB in mm:
+- `pitchDeg`, `bbHeightMm`, `wheelbaseMm`
+- `barClampMm {x, y}`, `saddleClampMm {x, y}`, `lowestPedalMm`
+
+**`derivedQuality[key]`** gives `{quality: recorded | estimate | unavailable, notes[]}`:
+- A value is **recorded** only when every input is recorded data.
+- Any representative frame or fork, modelled tire height, display stack or display saddle height makes it an **estimate**, and the note says why.
+- A value that cannot be computed is **unavailable**. It is never filled in.
 
 Each `AssemblyNode` has:
 - `id`, `slot`, `label`
@@ -213,6 +237,33 @@ Contact is verified to within 0.5 mm. A longer fork therefore pitches the frame 
 | `host_unavailable` | The part it mounts on is unavailable | "Mount point unavailable" |
 | `invalid_binding` | Asset unknown, or wrong kind, template or category | "3D model does not fit this bike" |
 | `not_in_prototype` | Slot not implemented yet | data-only (existing notice) |
+
+### 6.4.1 Generators (P1)
+
+Each generator is a `GeneratorDef { id, version, required[], resolve(dims, {position, variant}), build(params), profile2d(params) }` (`src/lib/assembly/generators/`).
+- `resolve` reads **only recorded dimensions**. It returns `missing[]`: if anything required is missing, the node is `missing_dimensions` and no geometry is built.
+- Every display choice that is not data is listed in `assumptions[]` and shown in the UI.
+- `build` and `profile2d` take the **same params**, so the 2D side view (`projection2d.ts`) is the generator's own profile transformed by the node's world pose. There is no second 2D geometry calculation.
+
+| Generator | Required (recorded) | Optional / assumed (listed) |
+|---|---|---|
+| wheel v2 | BSD (`wheel_size` / `bsd_mm`) | rim depth/width; hub spacing from axle standard (OLD); `rotor` anchor only for `brake_type: disc` |
+| tire | width + BSD | outer height = 0.94 × width |
+| stem | length, angle | steerer/bar clamp Ø (28.6/31.8 shown), clamp stack 40 mm |
+| handlebar `drop` | width, reach, drop | flare (0°), clamp Ø |
+| handlebar `flat` | width | rise, backsweep (0), clamp Ø |
+| seatpost | length, diameter | setback (0) |
+| crankset | crank length, chainring teeth | chainline 43.5 mm, ring spacing 5.5 mm, arms horizontal |
+| cassette | cog teeth | cog pitch from speed count (12 s = 3.5 mm …) |
+| chain | speed count | on big ring / smallest cog; lower run straight (derailleur not modelled) |
+| rotor | diameter | spider/vents cosmetic |
+
+Sprocket pitch radius = 12.7 mm / (2 sin(π / teeth)).
+
+**Temporary demo links (P1).** `src/features/studio/assembly/demo-bindings.ts` maps demo catalogue slugs to an asset or a generator. P3 replaces this with the `component_visuals` table, so there are no database changes in P1.
+- A component without a link has no 3D representation.
+- Custom parts never have one.
+- Authored assets declare `matchesRecordedGeometry` only when they were built to the component's recorded dimensions. The demo carbon fork is built to its recorded 370 mm axle-to-crown and 47 mm offset. The demo frame is not built to recorded geometry.
 
 ### 6.5 Fingerprints
 - `geometryFingerprint`: positions in asset-root space quantised to 0.1 mm, plus indices, ordered by node name. The pipeline computes it; the browser recomputes it after decoding (wasm or JavaScript) and compares.
@@ -282,7 +333,7 @@ The CSP adds only `'wasm-unsafe-eval'` to `script-src`. A unit test and the secu
 | Frame | ≤ 40k / 15k tris | demo frames: 592 tris |
 | Fork | ≤ 10k / 4k | demo forks: 204 tris |
 | Wheel + spokes + tire (generated) | ≤ 18k / 7k | 5,376 tris per wheel + tire (1,920 + 3,456) |
-| Whole bike | ≤ 150k / 60k tris; ≤ 120 draw calls | P0 scene: 18 geometries |
+| Whole bike | ≤ 150k / 60k tris; ≤ 120 draw calls | P1 full road build: 22,792 tris, 18 meshes (hardtail 22,520 / 18); unit-tested |
 | Transfer (compressed) | ≤ 3 MB per bike | meshopt: 40k tris 968 KB → 250 KB; 150k tris 3.6 MB → 933 KB |
 | Decode, WASM (Node, this CI class) | ≤ 20 ms per bike | 2.1 ms (40k) / 7.2 ms (150k) |
 | Decode, JS fallback | ≤ 150 ms per bike on mobile *(to measure on device)* | 5.1 ms / 15.3 ms (Node) |
@@ -292,6 +343,8 @@ The CSP adds only `'wasm-unsafe-eval'` to `script-src`. A unit test and the secu
 
 | Layer | What | Where |
 | --- | --- | --- |
+| Unit, P1 | Full road and hardtail builds from the demo links. Replacements change exactly the right measurements: crank +5 mm → pedal −5 mm; stem length/angle → bar clamp at the exact length; cassette and chain radii; rotor radius; tire → ride height. Also covered: clamp-mismatch reporting, missing dimensions, unlinked parts, rim-brake rotors, chain without hosts, measurement quality, level bar, 2D parity, budgets, adapters, revision refs | `tests/unit/assembly-p1.test.ts` |
+| Browser, studio (P1) | The real studio with the engine on: modular render, UI replacement (pixels, geometry, measurements), before/after, missing dimensions, 2D, save revision and reload, classic fallback (remembered), unsupported category, empty build, tampered manifest, overflow | `tests/e2e/studio-assembly.e2e.mjs`: Chromium plus Linux WebKit desktop, iPhone 15 and iPad Pro 11 emulation, in the Supabase job |
 | Unit, pure | Attachment maths and tolerances, axis rules, resolver (assembly, replacements, derived values, missing data, no stale geometry, templates and categories, interface warnings), generators (bounds, assumptions, determinism), 2D projection, revision refs and reproduction, contract validation | `tests/unit/assembly.test.ts` |
 | Unit, assets | Manifest integrity, content addressing, decoded fingerprint with WASM **and** JS decoders, contract after decoding, representation honesty, vendored decoder drift | `tests/unit/assembly-assets.test.ts` |
 | Pipeline | Determinism (CI re-author + re-run + diff) | CI `quality` |
