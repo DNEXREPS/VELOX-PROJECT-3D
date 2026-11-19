@@ -6,6 +6,7 @@ import { getSession } from "@/server/auth";
 import { fail, fromDbError, fromZodError, ok, type ActionResult } from "@/lib/action-result";
 import { IMAGE_MAX_BYTES, maintenanceSchema, type MaintenanceInput } from "@/lib/validation/schemas";
 import { EXTENSION, validateImageFile } from "@/lib/uploads";
+import { discardUpload, reportStorageError, scheduleUserCleanup } from "@/server/storage-cleanup";
 
 const uuid = z.uuid();
 const AUTH = "Sign in to continue.";
@@ -72,11 +73,11 @@ export async function deleteMaintenance(recordId: string): Promise<ActionResult>
   const session = await getSession();
   if (!session) return fail(AUTH);
   const { supabase, userId } = session;
-  const { data: photos } = await supabase.from("maintenance_photos").select("storage_path").eq("record_id", recordId);
-  if (photos?.length) await supabase.storage.from("maintenance-media").remove(photos.map((p) => p.storage_path));
+  // Row first; the delete trigger queues the record's photo folder for removal.
   const { data, error } = await supabase.from("maintenance_records").delete().eq("id", recordId).eq("owner_id", userId).select("bicycle_id");
-  if (error) return fromDbError(error);
+  if (error) return fromDbError(error, "Could not delete the record.", "maintenance.delete");
   if (!data?.length) return fail("Record not found.");
+  scheduleUserCleanup(supabase);
   revalidatePath(`/garage/${data[0].bicycle_id}`, "layout");
   return ok(undefined, "Record deleted.");
 }
@@ -93,11 +94,14 @@ export async function uploadMaintenancePhoto(formData: FormData): Promise<Action
   if (!rec) return fail("Record not found.");
   const path = `${userId}/${recordId}/${randomUUID()}.${EXTENSION[check.mime]}`;
   const { error: upErr } = await supabase.storage.from("maintenance-media").upload(path, check.bytes, { contentType: check.mime });
-  if (upErr) return fail("Upload failed. Please try again.");
+  if (upErr) {
+    reportStorageError(upErr, "maintenance_photo.upload", "maintenance-media");
+    return fail("Upload failed. Please try again.");
+  }
   const { error } = await supabase.from("maintenance_photos").insert({ record_id: recordId, owner_id: userId, storage_path: path });
   if (error) {
-    await supabase.storage.from("maintenance-media").remove([path]);
-    return fromDbError(error);
+    await discardUpload(supabase, "maintenance-media", path, "maintenance_photo.upload");
+    return fromDbError(error, "Could not save the photo.", "maintenance_photo.insert");
   }
   revalidatePath(`/garage/${rec.bicycle_id}/maintenance`);
   return ok(undefined, "Photo added.");

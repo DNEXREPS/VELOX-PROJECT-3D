@@ -5,10 +5,22 @@ on:
     branches: [main, "claude/**"]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUPABASE_CLI_VERSION: 3.2.0
+  PLAYWRIGHT_VERSION: 1.63.0
+
 jobs:
   quality:
     name: Typecheck · Lint · Unit tests · Build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,12 +30,18 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      # Includes static security guards (server-action auth, service-role isolation,
+      # additive-only migrations) in tests/unit/security-guards.test.ts.
       - run: npm test
+      # Built WITHOUT Supabase variables: the case where pages used to become static.
       - run: npm run build
+      - name: No HTML route is prerendered static under the nonce CSP
+        run: npm run check:static-routes
 
   database:
-    name: Migrations + RLS integration tests
+    name: Migrations + RLS integration tests (Postgres 16)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16
@@ -47,3 +65,65 @@ jobs:
       - name: Apply shim, migrations and seed
         run: scripts/db-apply.sh "$DATABASE_URL"
       - run: npm run test:db
+
+  supabase-e2e:
+    name: Real Supabase stack · RLS · E2E journey · Security E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Start local Supabase (applies migrations + seed)
+        run: npx --yes supabase@${SUPABASE_CLI_VERSION} start -x studio,imgproxy,vector,logflare,edge-runtime,realtime,supavisor
+
+      - name: Export local stack credentials (throwaway, CI-only)
+        run: |
+          npx --yes supabase@${SUPABASE_CLI_VERSION} status -o env > /tmp/sb.env
+          get() { grep "^$1=" /tmp/sb.env | head -1 | cut -d= -f2- | tr -d '"'; }
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(get API_URL)"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(get ANON_KEY)"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$(get SERVICE_ROLE_KEY)"
+            echo "DATABASE_URL=$(get DB_URL)"
+            echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
+            echo "CRON_SECRET=$(openssl rand -hex 32)"
+            echo "SERVER_LOG=${RUNNER_TEMP}/next-start.log"
+          } >> "$GITHUB_ENV"
+
+      - name: RLS & hardening suites against the real Supabase Postgres
+        run: npm run test:db
+
+      - name: Install Playwright (Chromium)
+        run: |
+          npm install --no-save playwright@${PLAYWRIGHT_VERSION}
+          npx playwright install --with-deps chromium
+
+      - name: Build and start the production server
+        run: |
+          npm run build
+          npm run check:static-routes
+          nohup npm start > "$SERVER_LOG" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/ && exit 0; sleep 1; done
+          echo "server did not start"; cat "$SERVER_LOG"; exit 1
+
+      - name: E2E journey (16 steps)
+        run: node tests/e2e/journey.e2e.mjs http://localhost:3000 "${RUNNER_TEMP}/e2e-screenshots"
+
+      - name: Security E2E (CSP, uploads, storage cleanup, rate limits, monitoring, auth links)
+        run: node tests/e2e/security.e2e.mjs http://localhost:3000
+
+      - name: Upload screenshots and server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-debug
+          path: |
+            ${{ runner.temp }}/e2e-screenshots
+            ${{ runner.temp }}/next-start.log
+          retention-days: 7

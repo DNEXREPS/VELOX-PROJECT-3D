@@ -1703,6 +1703,22 @@ export type Database = {
       };
     };
     Functions: {
+      claim_storage_cleanup_jobs: {
+        Args: { p_limit?: number };
+        Returns: { attempts: number; bucket: string; id: number; object_path: string | null; prefix: string | null }[];
+      };
+      finish_storage_cleanup_job: {
+        Args: { p_error?: string | null; p_id: number };
+        Returns: string;
+      };
+      request_storage_cleanup: {
+        Args: { p_bucket: string; p_path: string };
+        Returns: undefined;
+      };
+      retry_failed_storage_cleanup: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
       apply_bicycle_configuration: {
         Args: { p_bicycle_id: string; p_changes: Json; p_description?: string };
         Returns: {

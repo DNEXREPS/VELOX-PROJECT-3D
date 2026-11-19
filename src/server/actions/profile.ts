@@ -5,6 +5,7 @@ import { getSession } from "@/server/auth";
 import { fail, fromDbError, fromZodError, ok, type ActionResult } from "@/lib/action-result";
 import { AVATAR_MAX_BYTES, profileSchema } from "@/lib/validation/schemas";
 import { EXTENSION, validateImageFile } from "@/lib/uploads";
+import { discardUpload, reportStorageError, scheduleUserCleanup } from "@/server/storage-cleanup";
 
 export async function updateProfile(input: unknown): Promise<ActionResult> {
   const parsed = profileSchema.safeParse(input);
@@ -33,10 +34,17 @@ export async function uploadAvatar(formData: FormData): Promise<ActionResult> {
   const { supabase, userId, profile } = session;
   const path = `${userId}/${randomUUID()}.${EXTENSION[check.mime]}`;
   const { error: upErr } = await supabase.storage.from("avatars").upload(path, check.bytes, { contentType: check.mime });
-  if (upErr) return fail("Upload failed. Please try again.");
+  if (upErr) {
+    reportStorageError(upErr, "avatar.upload", "avatars");
+    return fail("Upload failed. Please try again.");
+  }
   const { error } = await supabase.from("profiles").update({ avatar_path: path }).eq("id", userId);
-  if (error) return fromDbError(error);
-  if (profile.avatar_path) await supabase.storage.from("avatars").remove([profile.avatar_path]);
+  if (error) {
+    await discardUpload(supabase, "avatars", path, "avatar.upload");
+    return fromDbError(error, "Could not save your avatar.", "avatar.update");
+  }
+  // The previous avatar is queued for removal by a database trigger.
+  if (profile.avatar_path) scheduleUserCleanup(supabase);
   revalidatePath("/", "layout");
   return ok(undefined, "Avatar updated.");
 }
@@ -44,8 +52,9 @@ export async function uploadAvatar(formData: FormData): Promise<ActionResult> {
 export async function removeAvatar(): Promise<ActionResult> {
   const session = await getSession();
   if (!session) return fail("Sign in to continue.");
-  if (session.profile.avatar_path) await session.supabase.storage.from("avatars").remove([session.profile.avatar_path]);
-  await session.supabase.from("profiles").update({ avatar_path: null }).eq("id", session.userId);
+  const { error } = await session.supabase.from("profiles").update({ avatar_path: null }).eq("id", session.userId);
+  if (error) return fromDbError(error, "Could not remove your avatar.", "avatar.remove");
+  if (session.profile.avatar_path) scheduleUserCleanup(session.supabase);
   revalidatePath("/", "layout");
   return ok(undefined, "Avatar removed.");
 }

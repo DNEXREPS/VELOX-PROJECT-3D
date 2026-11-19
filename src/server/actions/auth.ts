@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { fail, fromZodError, ok, type ActionResult } from "@/lib/action-result";
 import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema } from "@/lib/validation/schemas";
 import { safeRedirectPath } from "@/lib/auth/routes";
+import { destinationAfterConfirm, parseEmailLink } from "@/lib/auth/email-link";
 import { siteUrl } from "@/lib/env";
 
 const NOT_CONFIGURED = "Authentication is unavailable: Supabase is not configured for this deployment.";
@@ -71,4 +72,18 @@ export async function updatePassword(input: unknown): Promise<ActionResult> {
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) return fail(error.code === "same_password" ? "Choose a password you have not used before." : "Could not update the password.");
   return ok(undefined, "Password updated.");
+}
+
+/**
+ * Redeem an auth e-mail link. Only reachable by POST (Server Action, same-origin checked
+ * by Next.js), so link pre-fetching by mail scanners cannot consume the one-time token.
+ */
+export async function confirmEmailLink(formData: FormData): Promise<void> {
+  const link = parseEmailLink({ token_hash: formData.get("token_hash"), type: formData.get("type"), next: formData.get("next") });
+  if (!link) redirect("/login?error=callback");
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) redirect("/login?error=callback");
+  const { error } = await supabase.auth.verifyOtp({ token_hash: link.tokenHash, type: link.type });
+  if (error) redirect("/login?error=callback");
+  redirect(destinationAfterConfirm(link));
 }

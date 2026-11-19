@@ -252,6 +252,21 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Token-hash links (work when the e-mail is opened in a different browser than the one
+# that signed up, unlike the default PKCE links). Paste the same HTML into the hosted
+# project: Authentication → Emails → Templates (see docs/deployment/staging.md).
+[auth.email.template.confirmation]
+subject = "Confirm your VELOX account"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your VELOX password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new e-mail address"
+content_path = "./supabase/templates/email_change.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

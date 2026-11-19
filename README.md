@@ -39,8 +39,13 @@ Without Supabase variables the app still builds and renders: every data page sho
 | `NEXT_PUBLIC_SUPABASE_URL` | browser + server | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser + server | Anon / publishable key (RLS enforces access) |
 | `NEXT_PUBLIC_SITE_URL` | server | Origin for auth email redirects and share links |
-| `SUPABASE_SERVICE_ROLE_KEY` | **CLI only** | Used by `npm run catalog:import`; never read by the web app |
+| `SUPABASE_SERVICE_ROLE_KEY` | **server only** | Scheduled storage cleanup route (`server-only` module) and `npm run catalog:import`. Never exposed to the browser |
+| `CRON_SECRET` | server only | Bearer secret Vercel Cron sends to `/api/cron/storage-cleanup` (≥ 32 chars) |
+| `IMAGE_HOSTS_ALLOWLIST` | server | Optional comma-separated hosts for external component images (CSP + rendering) |
+| `MONITORING_WEBHOOK_URL` / `_TOKEN` | server | Optional HTTPS endpoint receiving monitoring events |
 | `DATABASE_URL` | tests only | Postgres URL for the RLS integration suite |
+
+Validate a configuration without printing secrets: `npm run env:check -- --target production --file <env file>`.
 
 ## Scripts
 
@@ -49,8 +54,12 @@ Without Supabase variables the app still builds and renders: every data page sho
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm run typecheck` · `npm run lint` | `tsc --noEmit` · ESLint |
 | `npm test` | Unit tests (compatibility, analytics, maintenance, revisions, validation, uploads, 3D asset mapping, schema sync) |
-| `npm run db:local` then `DATABASE_URL=… npm run test:db` | Throwaway Postgres 16 + Supabase shim → migrations + seed → RLS/ownership/integrity suite |
-| `node tests/e2e/journey.e2e.mjs [baseUrl]` | Playwright end-to-end journey against a running app + local Supabase |
+| `npm run db:local` then `DATABASE_URL=… npm run test:db` | Throwaway Postgres 16 + Supabase shim → migrations + seed → RLS/ownership/integrity + hardening suites. Fails (never skips) without `DATABASE_URL` |
+| `npm run test:e2e -- [baseUrl]` | Playwright end-to-end journey against a running app + local Supabase |
+| `npm run test:e2e:security -- [baseUrl]` | Security E2E (CSP, uploads, storage cleanup, rate limits, monitoring, auth links); needs local stack env vars, see file header |
+| `npm run env:check` | Validate deployment environment variables |
+| `npm run db:push:dry` | Show which migrations `supabase db push` would apply to the linked project |
+| `npm run db:checksums` | Record the checksum of a NEW migration (applied migrations are immutable; enforced by a unit test) |
 | `npm run check` | typecheck + lint + unit tests + production build |
 | `npm run db:seed:build` | Regenerate `supabase/seed.sql` from `supabase/catalog/*.json` |
 | `npm run catalog:import -- file.json` | Import a real, sourced catalogue (service role) |
@@ -59,10 +68,15 @@ Without Supabase variables the app still builds and renders: every data page sho
 
 ## Deployment (Vercel + Supabase)
 
-1. Create a Supabase project; `npx supabase link` then `npx supabase db push` (applies `supabase/migrations`). Load categories + the demo catalogue with `supabase/seed.sql` if wanted.
-2. In Supabase Auth settings, set the Site URL and add `https://<your-domain>/auth/callback` as a redirect URL.
-3. On Vercel, set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`.
-4. To make a moderator: `update public.profiles set role = 'moderator' where username = '…';` (SQL editor / service role).
+Step-by-step staging guide, including the manual steps that need a project owner: **[`docs/deployment/staging.md`](docs/deployment/staging.md)**. It covers:
+- hosted Supabase: migrations with a dry run first, auth URLs, email templates, SMTP
+- Vercel environment variables and the cleanup cron
+- a smoke-test checklist and monitoring
+
+CI (`.github/workflows/ci.yml`) runs:
+- typecheck, lint, unit and static security tests, and the production build
+- the RLS suites on Postgres 16
+- a full local Supabase stack, running the RLS suites, the E2E journey and the security E2E
 
 ## Data honesty
 
@@ -74,3 +88,4 @@ Without Supabase variables the app still builds and renders: every data page sho
 
 - [`docs/architecture.md`](docs/architecture.md) — structure, data model, security model, decisions (ADRs), known gaps
 - [`docs/3d-assets.md`](docs/3d-assets.md) — 3D asset requirements and how to add production models
+- [`docs/deployment/staging.md`](docs/deployment/staging.md) — staging deployment, manual steps, smoke tests, operations

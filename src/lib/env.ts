@@ -19,6 +19,18 @@ export function isSupabaseConfigured(): boolean {
   return getSupabaseEnv() !== null;
 }
 
-export function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+/**
+ * Public origin used in auth e-mails and share links.
+ * NEXT_PUBLIC_SITE_URL wins. On Vercel preview deployments without it, the branch URL
+ * (stable per branch) is used so confirmation/reset links return to the same preview.
+ * Production must always set NEXT_PUBLIC_SITE_URL explicitly.
+ */
+export function siteUrl(env: Record<string, string | undefined> = process.env): string {
+  const explicit = env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+  if (env.VERCEL_ENV === "preview") {
+    const host = env.VERCEL_BRANCH_URL || env.VERCEL_URL;
+    if (host) return `https://${host.replace(/^https?:\/\//, "").replace(/\/$/, "")}`;
+  }
+  return "http://localhost:3000";
 }
