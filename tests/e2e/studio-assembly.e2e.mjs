@@ -129,35 +129,29 @@ async function selectSlot(label) {
   if (desktop()) {
     await page.locator("aside nav button", { hasText: label }).first().click();
   } else {
-    // On short phone screens the open part sheet covers the "Parts" button: close it first, as a rider would.
-    await closePanel();
     await page.getByRole("button", { name: "Parts", exact: true }).click();
     await page.getByRole("dialog").locator("nav button", { hasText: label }).first().click();
   }
   await page.getByRole("button", { name: /^(Add part|Replace part)$/ }).waitFor({ timeout: 10000 });
 }
-/**
- * Viewer toolbar buttons (2D, Show saved) sit at the top of the viewer. On short phones the open
- * part sheet covers the lower ~60% of the screen, so scroll the page to the top first, as a rider
- * would, instead of letting the browser scroll the button just into view under the sheet.
- */
-async function tapViewer(testId) {
-  if (desktop()) return page.getByTestId(testId).click();
-  await page.evaluate(() => window.scrollTo(0, 0));
-  try {
-    await page.getByTestId(testId).click({ timeout: 4000 });
-  } catch {
-    // Still under the sheet (very short screens): close the panel, as a rider would.
-    await closePanel();
-    await page.getByTestId(testId).click();
-  }
-}
-/** Phones/tablets: the part sheet covers the pending-changes bar; close it like a user would. */
-async function closePanel() {
+/** Viewer toolbar buttons (2D, Show saved) — directly clickable on every screen size since the compact part sheet. */
+const tapViewer = (testId) => page.getByTestId(testId).click();
+/** Phones/tablets: the change description is shown once the part sheet is expanded. */
+async function expandSheet() {
   if (desktop()) return;
-  const close = page.getByRole("button", { name: "Close panel" });
-  if (await close.isVisible()) await close.click();
+  const toggle = page.getByTestId("sheet-toggle");
+  if ((await toggle.isVisible()) && (await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
 }
+/** True when the element is the top-most element at its own centre (not covered by a sheet or overlay). */
+const reachable = (locator) =>
+  locator.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
+    const top = document.elementFromPoint(x, y);
+    return !!top && (top === el || el.contains(top));
+  });
 async function previewPart(label, partName) {
   await selectSlot(label);
   await page.getByRole("button", { name: /^(Add part|Replace part)$/ }).click();
@@ -318,14 +312,13 @@ await step("2D side view is drawn from the same assembly and is interactive", as
 });
 
 await step("saving creates revision 2 and the viewer shows the saved geometry", async () => {
-  await closePanel();
   await page.getByRole("button", { name: "Cancel all" }).click();
   await settle();
   const before = await studioState();
   await previewPart("Front rotor", "Demo Rotor 140 mm Center Lock");
   await changedFrom(before.fingerprint);
   const preview = await studioState();
-  await closePanel();
+  await expandSheet();
   await page.fill('input[aria-label="Change description"]', "Smaller front rotor");
   await page.getByRole("button", { name: "Save revision" }).click();
   await page.getByText("Saved as revision 2").first().waitFor({ timeout: 20000 });
@@ -432,7 +425,6 @@ await step("MTB: replacing fork, flat bar, stem, crankset, cassette, chain and r
   assert(saved.showingBefore, "Show saved did not switch");
   await tapViewer("toggle-before");
   await changedFrom(saved.fingerprint);
-  await closePanel();
   await page.getByRole("button", { name: "Cancel all" }).click();
   await settle();
 });
@@ -445,7 +437,6 @@ await step("MTB: real interface mismatch (31.8 mm road stem, 35 mm bar) is flagg
   const bar = (await studioState()).nodes.find((n) => n.id === "handlebar");
   assert(bar.warnings.some((w) => w.startsWith("interface_mismatch:bar_clamp")), `no 3D mismatch: ${bar.warnings}`);
   await page.getByText("Incompatible").first().waitFor({ timeout: 10000 });
-  await closePanel();
   await page.getByRole("button", { name: "Cancel all" }).click();
   await settle();
 });
@@ -456,7 +447,7 @@ await step("MTB: saving a replacement creates revision 2 and survives reload; Cl
   await previewPart("Crankset", "Demo M12 Crankset 175 mm, 30T");
   await changedFrom(before.fingerprint);
   const preview = await studioState();
-  await closePanel();
+  await expandSheet();
   await page.fill('input[aria-label="Change description"]', "Longer cranks");
   await page.getByRole("button", { name: "Save revision" }).click();
   await page.getByText("Saved as revision 2").first().waitFor({ timeout: 20000 });
@@ -469,6 +460,26 @@ await step("MTB: saving a replacement creates revision 2 and survives reload; Cl
   await page.locator("canvas").first().waitFor({ timeout: 20000 });
   await page.getByTestId("viewer-switch").getByRole("button", { name: "Modular (beta)" }).click();
   await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+});
+
+await step("layout: with a part selected and a change pending, Parts/list, 2D, Show saved and Save stay directly reachable", async () => {
+  await openStudio(bikes.mtbFull);
+  const before = await studioState();
+  await previewPart("Stem", "Demo Alloy MTB Stem 70 mm (35 mm clamp, +6°)");
+  await changedFrom(before.fingerprint);
+  await page.waitForTimeout(300);
+  const targets = {
+    parts: desktop() ? page.locator("aside nav button", { hasText: "Fork" }).first() : page.getByRole("button", { name: "Parts", exact: true }),
+    toggle2d: page.getByTestId("toggle-2d"),
+    showSaved: page.getByTestId("toggle-before"),
+    save: page.getByRole("button", { name: "Save revision" }),
+    cancel: page.getByRole("button", { name: "Cancel all" }),
+  };
+  const blocked = [];
+  for (const [name, loc] of Object.entries(targets)) if (!(await reachable(loc))) blocked.push(name);
+  assert(blocked.length === 0, `not reachable: ${blocked.join(", ")}`);
+  await page.getByRole("button", { name: "Cancel all" }).click();
+  await settle();
 });
 
 await step("tampered asset manifest is rejected: classic viewer with notice, nothing from the manifest rendered", async () => {

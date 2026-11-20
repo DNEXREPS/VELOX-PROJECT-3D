@@ -247,10 +247,14 @@ Other notes:
   - The carbon drop bar lacks drop, and the flared bar lacks reach and drop, so both show "needs verification".
   - The rim-brake wheelset has no rotor mount, so its rotors are unavailable.
 - **MTB demo parts:** added (see "MTB hardtail demo expansion"). They are fictional demo data, and suspension is not modelled.
-- **Short phone screens (pre-existing studio layout, found by the iPhone 15 emulation):**
-  - while a part is selected, the part sheet (up to 60% of the screen height) covers the "Parts" button and the viewer's toolbar (2D, Show saved);
-  - riders must scroll up or close the panel first.
-  - Worth a small UX fix later: for example, make the sheet collapsible or move the toolbar.
+- **Short phone screens: fixed in the stabilization phase (pending CI and real-device confirmation).**
+  - **The problem:** the part sheet (up to 60% of the screen height) used to cover the Parts button, the viewer toolbar and the Save bar.
+  - **The fix, on narrow screens:**
+    - the sheet now opens compact (45%), with an Expand/Collapse toggle;
+    - the viewer shrinks to the space above it, and the page scrolls the studio to the top;
+    - Save and Cancel all live inside the sheet;
+    - the optional change description shows when the sheet is expanded.
+  - **Verification:** checked locally at iPhone SE, iPhone 15 and iPad Pro 11 sizes. The studio E2E now asserts these controls are directly reachable.
 - **One macOS WebGL flake:** in run 44634567208 the canvas never initialised for two lab steps on iPad emulation. This was not reproduced in the next run.
 - **Not modelled in P1:** saddle, pedals, derailleurs, brakes/calipers, grips/tape, headset spacers.
   - These slots are listed as not modelled and are never drawn with borrowed geometry.
