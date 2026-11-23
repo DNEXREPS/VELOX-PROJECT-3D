@@ -18,12 +18,16 @@ export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   const nonce = createNonce();
+  // Lab only (VELOX_LABS=1): `?csp=no-wasm` simulates browsers that cannot compile
+  // WebAssembly under CSP, to prove the JS-decoder / PNG fallbacks. Never in production.
+  const labNoWasm = process.env.VELOX_LABS === "1" && pathname.startsWith("/lab/") && request.nextUrl.searchParams.get("csp") === "no-wasm";
   const csp = buildCsp({
     nonce,
     isDev: process.env.NODE_ENV === "development",
     supabaseUrl: url,
     imageHosts: imageHostsFromEnv(),
     upgradeInsecureRequests: request.nextUrl.protocol === "https:",
+    allowWasm: !labNoWasm,
   });
   request.headers.set("x-nonce", nonce);
   request.headers.set("content-security-policy", csp);

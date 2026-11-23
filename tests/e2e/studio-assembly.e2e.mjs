@@ -1,0 +1,520 @@
+/**
+ * P1 studio E2E — modular assembly viewer in the real garage studio.
+ *
+ * Needs a running app built with NEXT_PUBLIC_ASSEMBLY_ENGINE=1 and the local Supabase stack
+ * (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY in the environment).
+ *
+ *   node tests/e2e/studio-assembly.e2e.mjs [baseUrl]
+ *   E2E_BROWSER=webkit E2E_DEVICE="iPhone 15" node tests/e2e/studio-assembly.e2e.mjs
+ *
+ * Setup uses the normal product paths only: UI registration, UI bike creation, and the
+ * apply_bicycle_configuration RPC called with the rider's OWN session token (RLS applies;
+ * no service-role key). Then, through the UI: modular render, real part replacement,
+ * missing-dimension state, before/after, 2D view, saving a revision, classic fallback,
+ * unsupported category, manifest integrity failure, mobile layout.
+ */
+import { createRequire } from "node:module";
+import { execSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
+
+async function loadPlaywright() {
+  try {
+    return await import("playwright");
+  } catch {
+    return createRequire(`${execSync("npm root -g").toString().trim()}/`)("playwright");
+  }
+}
+const pw = await loadPlaywright();
+if (process.env.E2E_SHOTS) mkdirSync(process.env.E2E_SHOTS, { recursive: true });
+const BASE = process.argv[2] ?? "http://localhost:3000";
+const ENGINE = process.env.E2E_BROWSER ?? "chromium";
+const DEVICE = process.env.E2E_DEVICE;
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+if (!SB_URL || !SB_ANON) {
+  console.error("NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are required");
+  process.exit(2);
+}
+
+const results = [];
+const step = async (name, fn) => {
+  try {
+    await fn();
+    results.push(["PASS", name]);
+    console.log("PASS", name);
+  } catch (e) {
+    results.push(["FAIL", name]);
+    console.log("FAIL", name, "-", String(e.message).split("\n")[0]);
+    // Diagnostics: Playwright's call log says which element and why it was not actionable.
+    const log = String(e.message).split("\n").slice(1).filter((l) => l.trim()).slice(0, 12);
+    if (log.length) console.log("  " + log.join("\n  "));
+    if (process.env.E2E_SHOTS && typeof page !== "undefined") {
+      const file = `${process.env.E2E_SHOTS}/studio-${ENGINE}-${(DEVICE ?? "desktop").replace(/\W+/g, "-")}-${results.length}.png`;
+      await page.screenshot({ path: file, fullPage: true }).then(() => console.log("  screenshot:", file)).catch(() => {});
+    }
+  }
+};
+const assert = (c, m) => {
+  if (!c) throw new Error(m);
+};
+
+const browser = await pw[ENGINE].launch();
+const ctxOpts = DEVICE ? { ...pw.devices[DEVICE] } : { viewport: { width: 1440, height: 950 } };
+console.log(`engine=${ENGINE} device=${DEVICE ?? "desktop"} (${browser.version()})`);
+const ctx = await browser.newContext(ctxOpts);
+// Record CSP violations from the first script on every page.
+await ctx.addInitScript(() => {
+  window.__cspViolations = [];
+  document.addEventListener("securitypolicyviolation", (e) => window.__cspViolations.push(`${e.violatedDirective} ${e.blockedURI}`));
+});
+const page = await ctx.newPage();
+const pageErrors = [];
+page.on("pageerror", (e) => pageErrors.push(e.message));
+
+const stamp = `${Date.now().toString(36)}${ENGINE.slice(0, 2)}${DEVICE ? DEVICE.replace(/\W/g, "").slice(0, 6) : ""}`.toLowerCase();
+const user = { email: `studio_${stamp}@example.test`, username: `studio_${stamp}`.slice(0, 30), password: "velox-test-2026" };
+const bikes = {};
+
+// ---------------------------------------------------------------- helpers
+const studioState = (p = page) => p.evaluate(() => (window.__veloxStudio ? JSON.parse(JSON.stringify(window.__veloxStudio)) : null));
+async function settle(p = page, timeout = 40000) {
+  try {
+    await p.waitForFunction(
+      () => {
+        const s = window.__veloxStudio;
+        if (!s?.render || s.render.pending !== 0) return false;
+        return s.nodes.every((n) => (n.sig ? s.render.rendered[n.id] === n.sig : s.render.rendered[n.id] === undefined));
+      },
+      null,
+      { timeout },
+    );
+  } catch (e) {
+    const s = await studioState(p).catch(() => null);
+    console.log("  settle diagnostics:", JSON.stringify(s && { nodes: s.nodes.map((n) => `${n.id}:${n.status}`), rendered: Object.keys(s.render?.rendered ?? {}), pending: s.render?.pending, errors: s.render?.errors }));
+    throw e;
+  }
+  await p.waitForTimeout(400);
+}
+/** Wait until the studio publishes a fingerprint different from `before`, then settle. */
+async function changedFrom(before, p = page) {
+  await p.waitForFunction((f) => window.__veloxStudio && window.__veloxStudio.fingerprint !== f, before, { timeout: 15000 });
+  await settle(p);
+}
+/** Fresh studio page for a bike, so one failed step cannot leave UI state behind for the next. */
+async function openStudio(bikeId) {
+  await page.goto(`${BASE}/garage/${bikeId}/studio`);
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+  await settle();
+}
+const snap = (p = page) =>
+  p.evaluate(() => {
+    const src = document.querySelector("[data-testid=assembly-canvas] canvas");
+    const c = document.createElement("canvas");
+    c.width = src.width;
+    c.height = src.height;
+    const g = c.getContext("2d");
+    g.drawImage(src, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    let h = 2166136261;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] + d[i + 1] + d[i + 2] > 140) lit++;
+      h = Math.imul(h ^ (d[i] ^ (d[i + 1] << 8) ^ (d[i + 2] << 16)), 16777619) >>> 0;
+    }
+    return { hash: h, lit, pixels: d.length / 4 };
+  });
+
+const desktop = () => page.viewportSize().width >= 1024;
+async function selectSlot(label) {
+  if (desktop()) {
+    await page.locator("aside nav button", { hasText: label }).first().click();
+  } else {
+    await page.getByRole("button", { name: "Parts", exact: true }).click();
+    await page.getByRole("dialog").locator("nav button", { hasText: label }).first().click();
+  }
+  await page.getByRole("button", { name: /^(Add part|Replace part)$/ }).waitFor({ timeout: 10000 });
+}
+/** Viewer toolbar buttons (2D, Show saved) — directly clickable on every screen size since the compact part sheet. */
+const tapViewer = (testId) => page.getByTestId(testId).click();
+/** Phones/tablets: the change description is shown once the part sheet is expanded. */
+async function expandSheet() {
+  if (desktop()) return;
+  const toggle = page.getByTestId("sheet-toggle");
+  if ((await toggle.isVisible()) && (await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+}
+/** True when the element is the top-most element at its own centre (not covered by a sheet or overlay). */
+const reachable = (locator) =>
+  locator.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
+    const top = document.elementFromPoint(x, y);
+    return !!top && (top === el || el.contains(top));
+  });
+async function previewPart(label, partName) {
+  await selectSlot(label);
+  await page.getByRole("button", { name: /^(Add part|Replace part)$/ }).click();
+  const row = page.locator("li", { hasText: partName }).last();
+  await row.waitFor({ timeout: 15000 });
+  await row.getByRole("button", { name: "Preview" }).click();
+}
+
+async function sb(path, { method = "GET", token, body } = {}) {
+  const res = await fetch(`${SB_URL}${path}`, {
+    method,
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${token ?? SB_ANON}`, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${method} ${path} → ${res.status} ${text.slice(0, 200)}`);
+  return text ? JSON.parse(text) : null;
+}
+async function createBike(name, category) {
+  await page.goto(`${BASE}/garage/new`);
+  await page.fill("#name", name);
+  await page.fill("#brand", "Testbrand");
+  await page.fill("#model", category);
+  await page.selectOption("#category", category);
+  await page.click("button[type=submit]");
+  await page.waitForURL(/\/garage\/[0-9a-f-]{36}$/, { timeout: 20000 });
+  return page.url().split("/").pop();
+}
+
+const ROAD_BUILD = {
+  frame: "demo-endurance-carbon-disc-frame",
+  fork: "demo-carbon-disc-fork",
+  wheelset: "demo-alloy-disc-wheelset",
+  front_tire: "demo-road-tire-700x28",
+  rear_tire: "demo-road-tire-700x28",
+  stem: "demo-alloy-stem-100",
+  handlebar: "demo-alloy-drop-bar-420",
+  seatpost: "demo-carbon-seatpost-27-2",
+  crankset: "demo-r12-crankset-50-34",
+  cassette: "demo-r12-cassette-11-34",
+  chain: "demo-r12-chain",
+  front_rotor: "demo-rotor-160-centerlock",
+  rear_rotor: "demo-rotor-160-centerlock",
+};
+
+const MTB_BUILD = {
+  frame: "demo-trail-hardtail-alloy-frame",
+  fork: "demo-rigid-mtb-fork-470",
+  wheelset: "demo-29-trail-wheelset",
+  front_tire: "demo-mtb-tire-29x2-4",
+  rear_tire: "demo-mtb-tire-29x2-4",
+  stem: "demo-alloy-mtb-stem-50",
+  handlebar: "demo-alloy-flat-bar-780",
+  seatpost: "demo-alloy-seatpost-31-6",
+  crankset: "demo-m12-crankset-170-32",
+  cassette: "demo-m12-cassette-10-51-ms",
+  chain: "demo-m12-chain",
+  front_rotor: "demo-rotor-180-6bolt",
+  rear_rotor: "demo-rotor-180-6bolt",
+};
+
+// ---------------------------------------------------------------- setup
+await step("setup: register a rider, create road / gravel / mountain bikes, apply full road and MTB builds (own token, RLS)", async () => {
+  await page.goto(`${BASE}/register`);
+  await page.fill("#email", user.email);
+  await page.fill("#username", user.username);
+  await page.fill("#password", user.password);
+  await page.fill("#confirmPassword", user.password);
+  await page.click("button[type=submit]");
+  await page.waitForURL("**/dashboard", { timeout: 20000 });
+  bikes.road = await createBike("Studio Road", "road");
+  bikes.gravel = await createBike("Studio Gravel", "gravel");
+  bikes.mtb = await createBike("Studio MTB", "mountain");
+  bikes.mtbFull = await createBike("Studio Hardtail", "mountain");
+  const { access_token: token } = await sb("/auth/v1/token?grant_type=password", { method: "POST", body: { email: user.email, password: user.password } });
+  const slugs = [...new Set([...Object.values(ROAD_BUILD), ...Object.values(MTB_BUILD)])];
+  const rows = await sb(`/rest/v1/components?select=id,slug&slug=in.(${slugs.join(",")})`, { token });
+  const id = Object.fromEntries(rows.map((r) => [r.slug, r.id]));
+  assert(slugs.every((s) => id[s]), `missing seeded components: ${slugs.filter((s) => !id[s])}`);
+  for (const [bike, build, label] of [[bikes.road, ROAD_BUILD, "road"], [bikes.mtbFull, MTB_BUILD, "MTB"]]) {
+    const rev = await sb("/rest/v1/rpc/apply_bicycle_configuration", {
+      method: "POST",
+      token,
+      body: { p_bicycle_id: bike, p_changes: Object.entries(build).map(([slot, slug]) => ({ slot, component_id: id[slug] })), p_description: `E2E ${label} build` },
+    });
+    assert(rev.revision_number === 1, `${label} revision ${rev.revision_number}`);
+  }
+});
+
+// ---------------------------------------------------------------- modular viewer
+await step("studio renders the full road build in the modular viewer (all parts, verified assets, no CSP violations)", async () => {
+  await page.goto(`${BASE}/garage/${bikes.road}/studio`);
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+  await settle();
+  const s = await studioState();
+  assert(s.viewer === "modular" && s.mode === "3d", `viewer ${s.viewer}/${s.mode}`);
+  assert(s.nodes.length === 14 && s.nodes.every((n) => n.status === "ok"), `nodes: ${s.nodes.map((n) => `${n.id}:${n.status}`)}`);
+  assert(s.render.errors.length === 0, `render errors: ${s.render.errors}`);
+  assert(s.render.report.integrityFailures.length === 0, "integrity failures");
+  assert(s.render.report.fingerprintMismatches.length === 0, "decoded geometry differs from pipeline");
+  const shot = await snap();
+  assert(shot.lit / shot.pixels > 0.005, `canvas looks empty (${shot.lit} lit)`);
+  const csp = await page.evaluate(() => window.__cspViolations);
+  assert(csp.length === 0, `CSP violations: ${csp}`);
+  // Measurements are labelled with their quality (estimate: frame geometry chart not recorded).
+  assert((await page.getByTestId("measure-wheelbaseMm").getAttribute("data-quality")) === "estimate", "wheelbase quality label");
+});
+
+await step("selected part shows its truthful 3D status (representative fork, generated stem)", async () => {
+  await selectSlot("Fork");
+  assert((await page.getByTestId("geometry-fork").first().getAttribute("data-representation")) === "representative", "fork representation");
+  await page.getByText("Not a model of this exact product.").first().waitFor();
+  await selectSlot("Stem");
+  assert((await page.getByTestId("geometry-stem").first().getAttribute("data-representation")) === "generated", "stem representation");
+});
+
+await step("replacing the stem (UI picker) regenerates it, moves the handlebar and changes pixels; Show saved restores the saved assembly", async () => {
+  const before = await studioState();
+  const shot = await snap();
+  await previewPart("Stem", "Demo Alloy Stem 90 mm (35 mm clamp)");
+  await changedFrom(before.fingerprint);
+  const after = await studioState();
+  const stem = (s) => s.nodes.find((n) => n.id === "stem");
+  assert(stem(after).sig !== stem(before).sig && after.render.geometry.stem !== before.render.geometry.stem, "stem geometry unchanged");
+  assert(after.derived.barClampMm.x < before.derived.barClampMm.x, `bar clamp x ${before.derived.barClampMm.x} → ${after.derived.barClampMm.x}`);
+  assert((await snap()).hash !== shot.hash, "pixels unchanged after replacement");
+  // The stem's 35 mm clamp vs the 31.8 mm bar is reported, not hidden.
+  const barWarnings = after.nodes.find((n) => n.id === "handlebar").warnings;
+  assert(barWarnings.some((w) => w.startsWith("interface_mismatch:bar_clamp")), `clamp mismatch not reported: ${barWarnings}`);
+  await tapViewer("toggle-before");
+  await changedFrom(after.fingerprint);
+  const saved = await studioState();
+  assert(saved.showingBefore && saved.fingerprint === before.fingerprint, "Show saved did not restore the saved assembly");
+  await tapViewer("toggle-before");
+  await changedFrom(before.fingerprint);
+});
+
+await step("a bar without recorded drop shows 'needs verification' and no stale bar geometry", async () => {
+  const before = await studioState();
+  await previewPart("Handlebar", "Demo Carbon Drop Bar 400");
+  await changedFrom(before.fingerprint);
+  const s = await studioState();
+  const bar = s.nodes.find((n) => n.id === "handlebar");
+  assert(bar.status === "missing_dimensions" && bar.missing.includes("drop_mm"), JSON.stringify(bar));
+  assert(s.render.rendered.handlebar === undefined, "old handlebar still rendered");
+  await page.getByText("Unavailable — needs verification: drop not recorded").first().waitFor();
+});
+
+await step("2D side view is drawn from the same assembly and is interactive", async () => {
+  await tapViewer("toggle-2d");
+  const svg = page.getByTestId("assembly-2d");
+  await svg.waitFor();
+  assert((await svg.locator("polyline").count()) >= 6, "2D polylines missing");
+  assert((await studioState()).mode === "2d", "mode not 2d");
+  await tapViewer("toggle-2d");
+  await page.getByTestId("assembly-canvas").waitFor();
+  await settle();
+});
+
+await step("saving creates revision 2 and the viewer shows the saved geometry", async () => {
+  await page.getByRole("button", { name: "Cancel all" }).click();
+  await settle();
+  const before = await studioState();
+  await previewPart("Front rotor", "Demo Rotor 140 mm Center Lock");
+  await changedFrom(before.fingerprint);
+  const preview = await studioState();
+  await expandSheet();
+  await page.fill('input[aria-label="Change description"]', "Smaller front rotor");
+  await page.getByRole("button", { name: "Save revision" }).click();
+  await page.getByText("Saved as revision 2").first().waitFor({ timeout: 20000 });
+  await page.waitForFunction(() => !document.querySelector("[data-testid=toggle-before]"), null, { timeout: 15000 });
+  // The pending change clears immediately; the saved parts arrive with the router refresh.
+  await page
+    .waitForFunction((f) => window.__veloxStudio?.fingerprint === f, preview.fingerprint, { timeout: 20000 })
+    .catch(() => {});
+  await settle();
+  const after = await studioState();
+  assert(after.fingerprint === preview.fingerprint, "saved assembly differs from the previewed one");
+  await page.reload();
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+  await settle();
+  assert((await studioState()).fingerprint === preview.fingerprint, "reloaded assembly differs (revision not persisted)");
+});
+
+await step("Classic viewer is selectable, remembered, and switching back works", async () => {
+  await page.getByTestId("viewer-switch").getByRole("button", { name: "Classic" }).click();
+  await page.getByTestId("modular-viewer").waitFor({ state: "detached" });
+  await page.locator("canvas").first().waitFor({ timeout: 20000 });
+  await page.reload();
+  await page.getByTestId("viewer-switch").waitFor();
+  assert((await page.getByTestId("modular-viewer").count()) === 0, "classic choice not remembered");
+  await page.getByTestId("viewer-switch").getByRole("button", { name: "Modular (beta)" }).click();
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+  await settle();
+});
+
+await step("unsupported category (gravel) shows an explicit notice and the classic viewer", async () => {
+  await page.goto(`${BASE}/garage/${bikes.gravel}/studio`);
+  const notice = page.getByTestId("engine-notice");
+  await notice.waitFor({ timeout: 20000 });
+  assert(/isn't available for gravel bikes/.test(await notice.innerText()), await notice.innerText());
+  assert((await page.getByTestId("modular-viewer").count()) === 0, "modular viewer shown for gravel");
+  await page.locator("canvas").first().waitFor({ timeout: 20000 });
+});
+
+await step("empty mountain bike: modular viewer with explicit empty states, no crash", async () => {
+  await page.goto(`${BASE}/garage/${bikes.mtb}/studio`);
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+  const s = await studioState();
+  assert(s.nodes.length === 0, `unexpected nodes ${s.nodes.map((n) => n.id)}`);
+  await selectSlot("Frame");
+  await page.getByText("No part recorded for this position.").first().waitFor();
+});
+
+// ---------------------------------------------------------------- MTB hardtail demo
+await step("MTB: full hardtail build from demo catalogue parts renders (all parts, honest labels)", async () => {
+  await page.goto(`${BASE}/garage/${bikes.mtbFull}/studio`);
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+  await settle();
+  const s = await studioState();
+  assert(s.nodes.length === 14 && s.nodes.every((n) => n.status === "ok"), `nodes: ${s.nodes.map((n) => `${n.id}:${n.status}`)}`);
+  assert(s.nodes.every((n) => n.warnings.length === 0), `warnings: ${JSON.stringify(s.nodes.filter((n) => n.warnings.length))}`);
+  const rep = Object.fromEntries(s.nodes.map((n) => [n.id, n.representation]));
+  assert(rep.frame === "representative" && rep.fork === "representative" && rep.handlebar === "generated", JSON.stringify(rep));
+  const shot = await snap();
+  assert(shot.lit / shot.pixels > 0.005, "canvas looks empty");
+  assert((await page.getByTestId("measure-wheelbaseMm").getAttribute("data-quality")) === "estimate", "wheelbase must be an estimate (no frame geometry chart)");
+});
+
+await step("MTB: replacing fork, flat bar, stem, crankset, cassette, chain and rotor (UI picker) updates 3D, dependants and 2D", async () => {
+  await openStudio(bikes.mtbFull);
+  const swaps = [
+    ["Fork", "fork", "Demo Rigid MTB Fork 480 (51 mm offset)", (a, b) => b.derived.wheelbaseMm > a.derived.wheelbaseMm],
+    ["Handlebar", "handlebar", "Demo Carbon Flat Bar 760", () => true],
+    ["Stem", "stem", "Demo Alloy MTB Stem 70 mm (35 mm clamp, +6°)", (a, b) => b.derived.barClampMm.x > a.derived.barClampMm.x],
+    ["Crankset", "crankset", "Demo M12 Crankset 175 mm, 30T", (a, b) => Math.abs(a.derived.lowestPedalMm - b.derived.lowestPedalMm - 5) < 0.05],
+    ["Cassette", "cassette", "Demo X12 Cassette 10–52 (XD)", () => true],
+    ["Chain", "chain", "Demo R11 Chain", () => true],
+    ["Front rotor", "rotor_front", "Demo Rotor 203 mm 6-Bolt", () => true],
+  ];
+  for (const [label, id, part, check] of swaps) {
+    const a = await studioState();
+    const shot = await snap();
+    await previewPart(label, part);
+    await changedFrom(a.fingerprint);
+    const b = await studioState();
+    const na = a.nodes.find((n) => n.id === id);
+    const nb = b.nodes.find((n) => n.id === id);
+    assert(nb.status === "ok" && nb.sig !== na.sig, `${label}: node not regenerated (${nb.status})`);
+    assert(b.render.rendered[id] === nb.sig, `${label}: new geometry not on screen`);
+    assert((await snap()).hash !== shot.hash || id === "chain", `${label}: pixels unchanged`);
+    assert(check(a, b), `${label}: measurement did not change as expected`);
+    if (id === "fork") {
+      const wf = b.nodes.find((n) => n.id === "wheel_front");
+      assert(wf.sig === a.nodes.find((n) => n.id === "wheel_front").sig && b.render.rendered.wheel_front === wf.sig, "front wheel lost after fork swap");
+    }
+    if (id === "crankset") assert(b.nodes.find((n) => n.id === "chain").sig !== a.nodes.find((n) => n.id === "chain").sig, "chain did not follow the new chainring");
+  }
+  // 2D is drawn from the same (previewed) assembly.
+  await tapViewer("toggle-2d");
+  await page.getByTestId("assembly-2d").waitFor();
+  assert((await page.locator("[data-testid=assembly-2d] [data-node=fork]").count()) > 0, "2D fork missing");
+  await tapViewer("toggle-2d");
+  await page.getByTestId("assembly-canvas").waitFor();
+  await settle();
+  // Before/after against the saved MTB build.
+  const preview = await studioState();
+  await tapViewer("toggle-before");
+  await changedFrom(preview.fingerprint);
+  const saved = await studioState();
+  assert(saved.showingBefore, "Show saved did not switch");
+  await tapViewer("toggle-before");
+  await changedFrom(saved.fingerprint);
+  await page.getByRole("button", { name: "Cancel all" }).click();
+  await settle();
+});
+
+await step("MTB: real interface mismatch (31.8 mm road stem, 35 mm bar) is flagged incompatible and reported by the 3D resolver", async () => {
+  await openStudio(bikes.mtbFull);
+  const a = await studioState();
+  await previewPart("Stem", "Demo Alloy Stem 100 mm");
+  await changedFrom(a.fingerprint);
+  const bar = (await studioState()).nodes.find((n) => n.id === "handlebar");
+  assert(bar.warnings.some((w) => w.startsWith("interface_mismatch:bar_clamp")), `no 3D mismatch: ${bar.warnings}`);
+  await page.getByText("Incompatible").first().waitFor({ timeout: 10000 });
+  await page.getByRole("button", { name: "Cancel all" }).click();
+  await settle();
+});
+
+await step("MTB: saving a replacement creates revision 2 and survives reload; Classic fallback still works", async () => {
+  await openStudio(bikes.mtbFull);
+  const before = await studioState();
+  await previewPart("Crankset", "Demo M12 Crankset 175 mm, 30T");
+  await changedFrom(before.fingerprint);
+  const preview = await studioState();
+  await expandSheet();
+  await page.fill('input[aria-label="Change description"]', "Longer cranks");
+  await page.getByRole("button", { name: "Save revision" }).click();
+  await page.getByText("Saved as revision 2").first().waitFor({ timeout: 20000 });
+  await page.reload();
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+  await settle();
+  assert((await studioState()).fingerprint === preview.fingerprint, "reloaded MTB assembly differs");
+  await page.getByTestId("viewer-switch").getByRole("button", { name: "Classic" }).click();
+  await page.getByTestId("modular-viewer").waitFor({ state: "detached" });
+  await page.locator("canvas").first().waitFor({ timeout: 20000 });
+  await page.getByTestId("viewer-switch").getByRole("button", { name: "Modular (beta)" }).click();
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+});
+
+await step("layout: with a part selected and a change pending, Parts/list, 2D, Show saved and Save stay directly reachable", async () => {
+  await openStudio(bikes.mtbFull);
+  const before = await studioState();
+  await previewPart("Stem", "Demo Alloy MTB Stem 70 mm (35 mm clamp, +6°)");
+  await changedFrom(before.fingerprint);
+  await page.waitForTimeout(300);
+  const targets = {
+    parts: desktop() ? page.locator("aside nav button", { hasText: "Fork" }).first() : page.getByRole("button", { name: "Parts", exact: true }),
+    toggle2d: page.getByTestId("toggle-2d"),
+    showSaved: page.getByTestId("toggle-before"),
+    save: page.getByRole("button", { name: "Save revision" }),
+    cancel: page.getByRole("button", { name: "Cancel all" }),
+  };
+  const blocked = [];
+  for (const [name, loc] of Object.entries(targets)) if (!(await reachable(loc))) blocked.push(name);
+  assert(blocked.length === 0, `not reachable: ${blocked.join(", ")}`);
+  await page.getByRole("button", { name: "Cancel all" }).click();
+  await settle();
+});
+
+await step("tampered asset manifest is rejected: classic viewer with notice, nothing from the manifest rendered", async () => {
+  const p2 = await ctx.newPage();
+  await p2.route("**/model-assets/manifest-*.json", async (route) => {
+    const res = await route.fetch();
+    const body = Buffer.from(await res.body());
+    body[body.length - 3] ^= 0x01;
+    await route.fulfill({ response: res, body });
+  });
+  await p2.goto(`${BASE}/garage/${bikes.road}/studio`);
+  const notice = p2.getByTestId("engine-notice");
+  await notice.waitFor({ timeout: 20000 });
+  assert(/could not be verified/.test(await notice.innerText()), await notice.innerText());
+  assert((await p2.getByTestId("modular-viewer").count()) === 0, "modular viewer shown with an unverified manifest");
+  await p2.close();
+});
+
+await step("layout: no horizontal overflow in the studio", async () => {
+  await page.goto(`${BASE}/garage/${bikes.road}/studio`);
+  await page.getByTestId("modular-viewer").waitFor({ timeout: 30000 });
+  await settle();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert(overflow <= 1, `overflows horizontally by ${overflow}px`);
+});
+
+await step("no uncaught page errors", async () => {
+  // WebKit reports same-origin fetches cancelled by a navigation (RSC prefetches, the classic
+  // viewer's GLB) as "… due to access control checks". Those are aborts, not application errors.
+  const host = new URL(BASE).host;
+  const aborted = (e) => e.includes(`${host}/`) && /due to access control checks/.test(e);
+  const relevant = pageErrors.filter((e) => !/ResizeObserver loop/.test(e) && !aborted(e));
+  assert(relevant.length === 0, relevant.slice(0, 3).join(" | "));
+});
+
+await browser.close();
+console.log(`\n${results.filter((r) => r[0] === "PASS").length}/${results.length} studio checks passed (${ENGINE}${DEVICE ? `, ${DEVICE}` : ""})`);
+process.exit(results.some((r) => r[0] === "FAIL") ? 1 : 0);

@@ -33,6 +33,11 @@ jobs:
       # Includes static security guards (server-action auth, service-role isolation,
       # additive-only migrations) in tests/unit/security-guards.test.ts.
       - run: npm test
+      - name: 3D asset pipeline is reproducible (re-author + re-run, committed output must match)
+        run: |
+          for f in scripts/assets/authors/*.mts; do npx tsx "$f"; done
+          npx tsx scripts/assets/pipeline.mts
+          git diff --exit-code -- assets-src public/model-assets
       # Built WITHOUT Supabase variables: the case where pages used to become static.
       - run: npm run build
       - name: No HTML route is prerendered static under the nonce CSP
@@ -67,9 +72,9 @@ jobs:
       - run: npm run test:db
 
   supabase-e2e:
-    name: Real Supabase stack · RLS · E2E journey · Security E2E
+    name: Real Supabase stack · RLS · E2E journey · Security E2E · Studio assembly
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     needs: quality
     steps:
       - uses: actions/checkout@v4
@@ -99,16 +104,21 @@ jobs:
       - name: RLS & hardening suites against the real Supabase Postgres
         run: npm run test:db
 
-      - name: Install Playwright (Chromium)
+      - name: Install Playwright (Chromium, WebKit)
+        # Browser downloads occasionally stall on hosted runners: bounded attempts with retries.
         run: |
           npm install --no-save playwright@${PLAYWRIGHT_VERSION}
-          npx playwright install --with-deps chromium
+          for i in 1 2 3; do
+            timeout 600 npx playwright install --with-deps chromium webkit && exit 0
+            echo "playwright install attempt $i failed; retrying"; sleep 10
+          done
+          exit 1
 
       - name: Build and start the production server
         run: |
           npm run build
           npm run check:static-routes
-          nohup npm start > "$SERVER_LOG" 2>&1 &
+          VELOX_LABS=1 nohup npm start > "$SERVER_LOG" 2>&1 &
           for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/ && exit 0; sleep 1; done
           echo "server did not start"; cat "$SERVER_LOG"; exit 1
 
@@ -118,6 +128,47 @@ jobs:
       - name: Security E2E (CSP, uploads, storage cleanup, rate limits, monitoring, auth links)
         run: node tests/e2e/security.e2e.mjs http://localhost:3000
 
+      - name: Assembly lab (Chromium; static and Supabase-hosted assets)
+        run: |
+          npx tsx scripts/assets/publish-local.mts
+          E2E_SUPABASE=1 node tests/e2e/assembly-lab.e2e.mjs http://localhost:3000
+
+      # ---- Same stack, rebuilt with the modular assembly engine switched on (P1) ----
+      - name: Rebuild and restart with NEXT_PUBLIC_ASSEMBLY_ENGINE=1
+        id: engine
+        run: |
+          pkill -f "next start" || true
+          pkill -f "next-server" || true
+          sleep 2
+          NEXT_PUBLIC_ASSEMBLY_ENGINE=1 npm run build
+          npm run check:static-routes
+          NEXT_PUBLIC_ASSEMBLY_ENGINE=1 VELOX_LABS=1 nohup npm start >> "$SERVER_LOG" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/ && exit 0; sleep 1; done
+          echo "server did not start"; tail -50 "$SERVER_LOG"; exit 1
+
+      - name: E2E journey with the engine on (no regressions)
+        run: E2E_ASSEMBLY_ENGINE=1 node tests/e2e/journey.e2e.mjs http://localhost:3000 "${RUNNER_TEMP}/e2e-screenshots-engine"
+
+      - name: Security E2E with the engine on
+        if: (success() || failure()) && steps.engine.outcome == 'success'
+        run: E2E_ASSEMBLY_ENGINE=1 node tests/e2e/security.e2e.mjs http://localhost:3000
+
+      - name: Studio assembly · Chromium desktop
+        if: (success() || failure()) && steps.engine.outcome == 'success'
+        run: E2E_SHOTS="${RUNNER_TEMP}/e2e-screenshots-engine" node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
+
+      - name: Studio assembly · WebKit desktop (Linux WebKit, not Safari)
+        if: (success() || failure()) && steps.engine.outcome == 'success'
+        run: E2E_BROWSER=webkit E2E_SHOTS="${RUNNER_TEMP}/e2e-screenshots-engine" node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
+
+      - name: Studio assembly · WebKit iPhone 15 emulation
+        if: (success() || failure()) && steps.engine.outcome == 'success'
+        run: E2E_BROWSER=webkit E2E_DEVICE="iPhone 15" E2E_SHOTS="${RUNNER_TEMP}/e2e-screenshots-engine" node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
+
+      - name: Studio assembly · WebKit iPad Pro 11 emulation
+        if: (success() || failure()) && steps.engine.outcome == 'success'
+        run: E2E_BROWSER=webkit E2E_DEVICE="iPad Pro 11" E2E_SHOTS="${RUNNER_TEMP}/e2e-screenshots-engine" node tests/e2e/studio-assembly.e2e.mjs http://localhost:3000
+
       - name: Upload screenshots and server log on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -125,5 +176,38 @@ jobs:
           name: e2e-debug
           path: |
             ${{ runner.temp }}/e2e-screenshots
+            ${{ runner.temp }}/e2e-screenshots-engine
             ${{ runner.temp }}/next-start.log
           retention-days: 7
+
+  webkit-devices:
+    name: Assembly lab · macOS WebKit (desktop, iPhone, iPad emulation)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright WebKit
+        run: |
+          npm install --no-save playwright@${PLAYWRIGHT_VERSION}
+          npx playwright install webkit
+      - name: Build and start (labs enabled, no backend needed)
+        # Dedicated port on 127.0.0.1: on the macOS runner another process answered on localhost:3000.
+        run: |
+          npm run build
+          VELOX_LABS=1 nohup npx next start -H 127.0.0.1 -p 3107 > "${RUNNER_TEMP}/next.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://127.0.0.1:3107/lab/assembly && exit 0; sleep 1; done
+          curl -sS -i http://127.0.0.1:3107/lab/assembly | head -20 || true
+          lsof -nP -iTCP -sTCP:LISTEN | head -30 || true
+          cat "${RUNNER_TEMP}/next.log"; exit 1
+      - name: WebKit desktop
+        run: E2E_BROWSER=webkit node tests/e2e/assembly-lab.e2e.mjs http://127.0.0.1:3107
+      - name: WebKit · iPhone 15 emulation
+        run: E2E_BROWSER=webkit E2E_DEVICE="iPhone 15" node tests/e2e/assembly-lab.e2e.mjs http://127.0.0.1:3107
+      - name: WebKit · iPad Pro 11 emulation
+        run: E2E_BROWSER=webkit E2E_DEVICE="iPad Pro 11" node tests/e2e/assembly-lab.e2e.mjs http://127.0.0.1:3107
