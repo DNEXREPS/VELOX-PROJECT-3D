@@ -7,6 +7,7 @@ import { fail, fromDbError, fromZodError, ok, type ActionResult } from "@/lib/ac
 import { bicycleSchema, IMAGE_MAX_BYTES, passportSettingsSchema, slugify } from "@/lib/validation/schemas";
 import { EXTENSION, validateImageFile } from "@/lib/uploads";
 import { DEFAULT_MODEL_KEY } from "@/features/studio/models/registry";
+import { discardUpload, reportStorageError, scheduleUserCleanup } from "@/server/storage-cleanup";
 
 const uuid = z.uuid();
 const AUTH = "Sign in to continue.";
@@ -104,19 +105,12 @@ export async function deleteBicycle(bikeId: string): Promise<ActionResult> {
   const { data: bike } = await supabase.from("bicycles").select("id").eq("id", bikeId).eq("owner_id", userId).maybeSingle();
   if (!bike) return fail("Bicycle not found.");
 
-  // Remove media first (storage objects are not cascaded by the database).
-  const prefix = `${userId}/${bikeId}`;
-  const { data: files } = await supabase.storage.from("bicycle-media").list(prefix, { limit: 1000 });
-  if (files?.length) await supabase.storage.from("bicycle-media").remove(files.map((f) => `${prefix}/${f.name}`));
-  const { data: records } = await supabase.from("maintenance_records").select("id").eq("bicycle_id", bikeId);
-  for (const r of records ?? []) {
-    const mp = `${userId}/${r.id}`;
-    const { data: mf } = await supabase.storage.from("maintenance-media").list(mp, { limit: 1000 });
-    if (mf?.length) await supabase.storage.from("maintenance-media").remove(mf.map((f) => `${mp}/${f.name}`));
-  }
-
+  // Delete the rows first. In the same transaction, database triggers queue the bicycle's
+  // media folders (photos + maintenance photos) for cleanup, so a failure at any later
+  // step can only delay file removal — it can never leave rows pointing at deleted files.
   const { error } = await supabase.from("bicycles").delete().eq("id", bikeId).eq("owner_id", userId);
-  if (error) return fromDbError(error, "Could not delete the bicycle.");
+  if (error) return fromDbError(error, "Could not delete the bicycle.", "bicycle.delete");
+  scheduleUserCleanup(supabase);
   revalidatePath("/garage");
   revalidatePath("/dashboard");
   return ok(undefined, "Bicycle deleted.");
@@ -162,12 +156,15 @@ export async function uploadBicycleImage(formData: FormData): Promise<ActionResu
 
   const path = `${userId}/${bikeId}/${randomUUID()}.${EXTENSION[check.mime]}`;
   const { error: upErr } = await supabase.storage.from("bicycle-media").upload(path, check.bytes, { contentType: check.mime, upsert: false });
-  if (upErr) return fail("Upload failed. Please try again.");
+  if (upErr) {
+    reportStorageError(upErr, "bicycle_image.upload", "bicycle-media");
+    return fail("Upload failed. Please try again.");
+  }
 
   const { data: img, error } = await supabase.from("bicycle_images").insert({ bicycle_id: bikeId, owner_id: userId, storage_path: path, caption }).select("id").single();
   if (error) {
-    await supabase.storage.from("bicycle-media").remove([path]);
-    return fromDbError(error, "Could not save the image.");
+    await discardUpload(supabase, "bicycle-media", path, "bicycle_image.upload");
+    return fromDbError(error, "Could not save the image.", "bicycle_image.insert");
   }
   if (makeCover || !bike.cover_image_path) await supabase.from("bicycles").update({ cover_image_path: path }).eq("id", bikeId);
   revalidatePath(`/garage/${bikeId}`, "layout");
@@ -181,14 +178,15 @@ export async function deleteBicycleImage(imageId: string): Promise<ActionResult>
   const { supabase, userId } = session;
   const { data: img } = await supabase.from("bicycle_images").select("id, bicycle_id, storage_path").eq("id", imageId).eq("owner_id", userId).maybeSingle();
   if (!img) return fail("Image not found.");
-  await supabase.storage.from("bicycle-media").remove([img.storage_path]);
+  // Row first; the delete trigger queues the object for removal (see deleteBicycle).
   const { error } = await supabase.from("bicycle_images").delete().eq("id", imageId);
-  if (error) return fromDbError(error);
+  if (error) return fromDbError(error, "Could not delete the image.", "bicycle_image.delete");
   const { data: bike } = await supabase.from("bicycles").select("cover_image_path").eq("id", img.bicycle_id).single();
   if (bike?.cover_image_path === img.storage_path) {
     const { data: next } = await supabase.from("bicycle_images").select("storage_path").eq("bicycle_id", img.bicycle_id).order("sort_order").limit(1).maybeSingle();
     await supabase.from("bicycles").update({ cover_image_path: next?.storage_path ?? null }).eq("id", img.bicycle_id);
   }
+  scheduleUserCleanup(supabase);
   revalidatePath(`/garage/${img.bicycle_id}`, "layout");
   return ok(undefined, "Image deleted.");
 }

@@ -18,7 +18,7 @@ export async function createPost(input: unknown): Promise<ActionResult<{ id: str
     .insert({ author_id: session.userId, title: parsed.data.title, body: parsed.data.body, bicycle_id: parsed.data.bicycle_id ?? null })
     .select("id")
     .single();
-  if (error) return fromDbError(error, error.code === "23514" ? "Only your own public bicycles can be linked." : "Could not publish the post.");
+  if (error) return fromDbError(error, error.code === "23514" ? "Only your own public bicycles can be linked." : "Could not publish the post.", "post.create");
   revalidatePath("/community");
   return ok({ id: data.id }, "Post published.");
 }
@@ -79,7 +79,7 @@ export async function addComment(input: unknown): Promise<ActionResult<{ id: str
     .insert({ post_id: parsed.data.postId, author_id: session.userId, body: parsed.data.body })
     .select("id")
     .single();
-  if (error) return fromDbError(error, "Could not add the comment.");
+  if (error) return fromDbError(error, "Could not add the comment.", "comment.create");
   revalidatePath(`/community/${parsed.data.postId}`);
   return ok({ id: data.id });
 }
@@ -135,6 +135,6 @@ export async function reportContent(input: unknown): Promise<ActionResult> {
   if (!session) return fail("Sign in to report content.");
   const { error } = await session.supabase.from("content_reports").insert({ ...parsed.data, details: parsed.data.details ?? null, reporter_id: session.userId });
   if (error?.code === "23505") return ok(undefined, "You have already reported this. Our moderators will review it.");
-  if (error) return fromDbError(error, "Could not submit the report.");
+  if (error) return fromDbError(error, "Could not submit the report.", "report.create");
   return ok(undefined, "Thanks — a moderator will review this report.");
 }

@@ -16,6 +16,7 @@ import { RULES } from "@/lib/compatibility/rules";
 import { SLOT_META, isBikeSlot } from "@/lib/domain/slots";
 import type { VerificationStatus } from "@/lib/domain/bicycle";
 import { formatDate, formatMoney, formatWeight } from "@/lib/format";
+import { imageHostsFromEnv, isAllowedImageUrl } from "@/lib/security/image-hosts";
 
 type Params = Promise<{ slug: string }>;
 
@@ -39,7 +40,11 @@ export default async function ComponentDetailPage({ params }: { params: Params }
   const canDelete = session && c.created_by === session.userId && c.verification_status === "user_submitted";
   const attrKeys = Object.keys(c.attributes);
   const relevantRules = RULES.filter((r) => attrKeys.includes(r.a.attribute) || attrKeys.includes(r.b.attribute));
-  const images = (c.images as unknown as { url: string; alt: string | null }[]) ?? [];
+  // Catalogue images can come from rider submissions: render only allow-listed sources
+  // (also enforced by the CSP img-src directive).
+  const imageHosts = imageHostsFromEnv();
+  const allImages = (c.images as unknown as { url: string; alt: string | null }[]) ?? [];
+  const images = allImages.filter((img) => isAllowedImageUrl(img.url, imageHosts, process.env.NEXT_PUBLIC_SUPABASE_URL));
 
   return (
     <Container>
@@ -70,7 +75,7 @@ export default async function ComponentDetailPage({ params }: { params: Params }
             <div className="flex gap-2 overflow-x-auto">
               {images.map((img, i) => (
                 // eslint-disable-next-line @next/next/no-img-element -- external/manufacturer imagery declared in data
-                <img key={i} src={img.url} alt={img.alt ?? c.name} className="h-48 border border-border object-contain" loading="lazy" />
+                <img key={i} src={img.url} alt={img.alt ?? c.name} className="h-48 border border-border object-contain" loading="lazy" referrerPolicy="no-referrer" />
               ))}
             </div>
           )}

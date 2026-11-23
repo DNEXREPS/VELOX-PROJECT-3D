@@ -2,22 +2,44 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/types/database";
 import { isAuthPage, isProtectedPath } from "@/lib/auth/routes";
+import { buildCsp, createNonce } from "@/lib/security/csp";
+import { imageHostsFromEnv } from "@/lib/security/image-hosts";
 
 /**
- * Refreshes the Supabase session cookie on every request and gates protected routes.
- * Authorisation of data is still enforced server-side and by RLS.
+ * Runs on every page/API request:
+ *  1. Content Security Policy with a per-request nonce (Next.js reads the nonce from the
+ *     request's CSP header and applies it to framework scripts).
+ *  2. Supabase session refresh and route gating. Authorisation of data is still enforced
+ *     server-side and by RLS (ADR-008).
  */
 export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const { pathname, search } = request.nextUrl;
 
+  const nonce = createNonce();
+  const csp = buildCsp({
+    nonce,
+    isDev: process.env.NODE_ENV === "development",
+    supabaseUrl: url,
+    imageHosts: imageHostsFromEnv(),
+    upgradeInsecureRequests: request.nextUrl.protocol === "https:",
+  });
+  request.headers.set("x-nonce", nonce);
+  request.headers.set("content-security-policy", csp);
+
+  const withCsp = <T extends NextResponse>(res: T): T => {
+    res.headers.set("content-security-policy", csp);
+    return res;
+  };
+  const next = () => NextResponse.next({ request: { headers: request.headers } });
+
   if (!url || !key) {
     // Backend not configured: protected pages render a configuration notice.
-    return NextResponse.next({ request });
+    return withCsp(next());
   }
 
-  let response = NextResponse.next({ request });
+  let response = next();
   const supabase = createServerClient<Database>(url, key, {
     cookies: {
       getAll() {
@@ -25,7 +47,7 @@ export async function proxy(request: NextRequest) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        response = next();
         cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
       },
     },
@@ -40,19 +62,21 @@ export async function proxy(request: NextRequest) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     login.search = `?next=${encodeURIComponent(pathname + search)}`;
-    return NextResponse.redirect(login);
+    return withCsp(NextResponse.redirect(login));
   }
 
   if (user && isAuthPage(pathname)) {
     const dash = request.nextUrl.clone();
     dash.pathname = "/dashboard";
     dash.search = "";
-    return NextResponse.redirect(dash);
+    return withCsp(NextResponse.redirect(dash));
   }
 
-  return response;
+  return withCsp(response);
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|models/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|glb|gltf)$).*)"],
+  // api/monitoring: anonymous beacons need no session; skipping the proxy means they can
+  // never be used to generate Supabase Auth traffic.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|models/|api/monitoring/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|glb|gltf)$).*)"],
 };

@@ -12,9 +12,13 @@ export type ServerSupabase = Awaited<ReturnType<typeof createSupabaseServerClien
  * Returns null when Supabase is not configured.
  */
 export async function createSupabaseServerClient() {
+  // Read request data first: the render mode (and therefore nonce-based CSP) must not depend
+  // on whether Supabase is configured. Otherwise unconfigured builds prerender pages as static
+  // HTML without nonces, and 'strict-dynamic' blocks all their scripts.
+  // See docs/security/csp-static-rendering.md.
+  const cookieStore = await cookies();
   const env = getSupabaseEnv();
   if (!env) return null;
-  const cookieStore = await cookies();
   return createServerClient<Database>(env.url, env.anonKey, {
     cookies: {
       getAll() {
