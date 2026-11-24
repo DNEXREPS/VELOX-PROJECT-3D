@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://velox.example/schemas/velox-assembly-1/asset-declaration.json",
+  "title": "VELOX asset declaration (velox-assembly/1)",
+  "description": "Root-node extras.velox of every authored 3D part. Structural schema for asset authors; the pipeline's validateAsset() (src/lib/assembly/validate.ts) additionally checks interface poses against the file, axis rules, measured dimensions, budgets, representation honesty and privacy.",
+  "type": "object",
+  "required": ["spec", "key", "version", "kind", "label", "representation", "categories", "units", "anchors", "mounts", "measured", "materials", "license", "author", "source", "demo"],
+  "additionalProperties": false,
+  "properties": {
+    "spec": { "const": "velox-assembly/1" },
+    "key": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 64 },
+    "version": { "type": "integer", "minimum": 1 },
+    "kind": { "enum": ["frame", "fork", "stem", "handlebar", "handlepost", "seatpost", "saddle", "crankset", "cassette", "rear_derailleur", "front_derailleur", "brake_caliper", "shifter", "pedal"] },
+    "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "representation": { "enum": ["exact", "representative"], "description": "'exact' only for a licensed model of this exact product. Generated geometry is never an authored asset." },
+    "categories": { "type": "array", "minItems": 1, "items": { "enum": ["road", "gravel", "mtb_hardtail", "folding"] } },
+    "template": { "enum": ["diamond", "hardtail", "folding"], "description": "Required for frames." },
+    "units": { "const": "m" },
+    "anchors": { "type": "object", "propertyNames": { "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$" }, "additionalProperties": { "$ref": "#/$defs/interface" } },
+    "mounts": { "type": "object", "propertyNames": { "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$" }, "additionalProperties": { "$ref": "#/$defs/interface" } },
+    "joints": {
+      "type": "object",
+      "description": "Reserved (suspension, folding).",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["node", "kind", "parentBody", "childBody", "pose", "range", "state"],
+        "properties": {
+          "node": { "type": "string", "pattern": "^JNT__[a-z0-9]+(_[a-z0-9]+)*$" },
+          "kind": { "enum": ["revolute", "prismatic"] },
+          "parentBody": { "type": "string" },
+          "childBody": { "type": "string" },
+          "pose": { "$ref": "#/$defs/pose" },
+          "range": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+          "state": { "type": "string" }
+        }
+      }
+    },
+    "measured": { "type": "object", "additionalProperties": { "type": "number" }, "description": "Millimetres / degrees, e.g. stack_mm, reach_mm, head_angle_deg, axle_to_crown_mm." },
+    "materials": { "type": "object", "propertyNames": { "pattern": "^MAT__[a-z0-9]+(_[a-z0-9]+)*$" }, "additionalProperties": { "enum": ["paint_primary", "paint_secondary", "metal", "rubber", "carbon", "decal", "plastic"] } },
+    "license": {
+      "type": "object",
+      "required": ["id"],
+      "properties": { "id": { "type": "string", "minLength": 1 }, "attribution": { "type": "string" }, "url": { "type": "string", "format": "uri" } },
+      "additionalProperties": false
+    },
+    "author": { "type": "string", "minLength": 1 },
+    "source": { "type": "string", "minLength": 1 },
+    "demo": { "type": "boolean" },
+    "textures": { "type": "array", "items": { "type": "object", "required": ["role", "source"], "properties": { "role": { "type": "string" }, "source": { "type": "string" } } } }
+  },
+  "$defs": {
+    "pose": {
+      "type": "object",
+      "required": ["t", "r"],
+      "properties": {
+        "t": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "description": "Translation in metres relative to the asset root." },
+        "r": { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4, "description": "Unit quaternion [x, y, z, w]." }
+      },
+      "additionalProperties": false
+    },
+    "interface": {
+      "type": "object",
+      "required": ["node", "type", "pose"],
+      "properties": {
+        "node": { "type": "string", "pattern": "^(ANC|MNT)__[a-z0-9]+(_[a-z0-9]+)*$" },
+        "type": { "enum": ["axle", "spindle", "tube", "clamp", "face", "bead", "spline", "thread"] },
+        "pose": { "$ref": "#/$defs/pose" },
+        "standard": { "type": "string" },
+        "slide": { "type": "object", "required": ["min", "max"], "properties": { "min": { "type": "number" }, "max": { "type": "number" } } },
+        "body": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -16,9 +16,13 @@ describe("Content Security Policy", () => {
     const scripts = directive(csp, "script-src");
     expect(scripts).toContain("'nonce-abc123=='");
     expect(scripts).toContain("'strict-dynamic'");
-    expect(scripts).not.toContain("unsafe-inline");
-    expect(scripts).not.toContain("unsafe-eval");
-    expect(directive(buildCsp({ ...base, isDev: true }), "script-src")).toContain("'unsafe-eval'");
+    // Token-level checks: 'wasm-unsafe-eval' (WebAssembly only) is allowed, general eval is not.
+    const tokens = scripts.split(" ").slice(1);
+    expect(tokens).not.toContain("'unsafe-inline'");
+    expect(tokens).not.toContain("'unsafe-eval'");
+    expect(tokens).toContain("'wasm-unsafe-eval'");
+    expect(directive(buildCsp({ ...base, isDev: true }), "script-src").split(" ")).toContain("'unsafe-eval'");
+    expect(directive(buildCsp({ ...base, allowWasm: false }), "script-src").split(" ")).not.toContain("'wasm-unsafe-eval'");
   });
 
   it("locks down framing, plugins, base URI and form targets", () => {

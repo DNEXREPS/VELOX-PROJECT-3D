@@ -363,6 +363,148 @@
       "name": "Demo Out-Front Computer Mount", "model": "AC-CM1",
       "weight_g": 40, "price_reference": 30, "currency": "EUR",
       "compatibility": { "clamp_mm": 31.8 }
+    },
+    {
+      "slug": "demo-trail-hardtail-alloy-frame", "brand": "velox-demo-works", "category": "frames",
+      "name": "Demo Trail Hardtail Alloy Frame", "model": "HT-A1", "material": "Aluminium",
+      "weight_g": 1850, "price_reference": 650, "currency": "EUR",
+      "description": "Sample 29\" trail hardtail frame for the MTB demo build. No geometry chart is recorded.",
+      "specs": [["frame_type", "Frame type", "Trail hardtail"], ["sizes", "Sizes", "S, M, L, XL"]],
+      "compatibility": { "bb_shell": "bsa_73", "rear_axle": "12x148_ta", "brake_type": "disc", "rear_brake_mount": "post_mount", "max_rotor_mm": 180, "max_tire_width_mm": 61, "wheel_sizes": ["700c"], "seatpost_diameter_mm": 31.6, "steerer_type": "tapered", "front_derailleur_mount": "none" }
+    },
+    {
+      "slug": "demo-rigid-mtb-fork-470", "brand": "velox-demo-works", "category": "forks",
+      "name": "Demo Rigid MTB Fork 470", "model": "RF-470", "material": "Chromoly steel",
+      "weight_g": 980, "price_reference": 180, "currency": "EUR",
+      "description": "Sample rigid 29\" fork with a suspension-corrected axle-to-crown.",
+      "specs": [["axle_to_crown", "Axle-to-crown", 470, "mm"], ["offset", "Offset", 44, "mm"]],
+      "compatibility": { "front_axle": "15x110_ta", "brake_type": "disc", "front_brake_mount": "post_mount", "max_rotor_mm": 203, "max_tire_width_mm": 61, "wheel_sizes": ["700c"], "steerer_type": "tapered", "steerer_diameter_mm": 28.6 }
+    },
+    {
+      "slug": "demo-rigid-mtb-fork-480", "brand": "velox-demo-works", "category": "forks",
+      "name": "Demo Rigid MTB Fork 480 (51 mm offset)", "model": "RF-480", "material": "Chromoly steel",
+      "weight_g": 1020, "price_reference": 190, "currency": "EUR",
+      "description": "Sample rigid 29\" fork with a longer axle-to-crown and more offset.",
+      "specs": [["axle_to_crown", "Axle-to-crown", 480, "mm"], ["offset", "Offset", 51, "mm"]],
+      "compatibility": { "front_axle": "15x110_ta", "brake_type": "disc", "front_brake_mount": "post_mount", "max_rotor_mm": 203, "max_tire_width_mm": 61, "wheel_sizes": ["700c"], "steerer_type": "tapered", "steerer_diameter_mm": 28.6 }
+    },
+    {
+      "slug": "demo-rigid-mtb-fork-unspecified", "brand": "velox-demo-works", "category": "forks",
+      "name": "Demo Rigid MTB Fork (geometry not recorded)", "model": "RF-X", "material": "Aluminium",
+      "weight_g": 900, "price_reference": 150, "currency": "EUR",
+      "description": "Sample fork whose axle-to-crown and offset are not recorded.",
+      "compatibility": { "front_axle": "15x110_ta", "brake_type": "disc", "front_brake_mount": "post_mount", "max_rotor_mm": 203, "max_tire_width_mm": 61, "wheel_sizes": ["700c"], "steerer_type": "tapered", "steerer_diameter_mm": 28.6 }
+    },
+    {
+      "slug": "demo-29-trail-wheelset", "brand": "velox-demo-works", "category": "wheelsets",
+      "name": "Demo 29\" Trail Wheelset", "model": "TW-29", "material": "Aluminium",
+      "weight_g": 1950, "price_reference": 420, "currency": "EUR",
+      "description": "Sample Boost 29\" trail wheelset.",
+      "specs": [["rim_depth", "Rim depth", 22, "mm"], ["internal_width", "Internal width", 30, "mm"]],
+      "compatibility": { "wheel_size": "700c", "front_axle": "15x110_ta", "rear_axle": "12x148_ta", "brake_type": "disc", "rotor_mount": "six_bolt", "freehub_bodies": ["shimano_microspline", "sram_xd"] }
+    },
+    {
+      "slug": "demo-mtb-tire-29x2-4", "brand": "velox-demo-works", "category": "tires",
+      "name": "Demo Trail Tire 29×2.4", "model": "TT-24", "material": "Rubber",
+      "weight_g": 980, "price_reference": 60, "currency": "EUR",
+      "description": "Sample 29×2.4\" trail tire.",
+      "specs": [["etrto", "ETRTO", "61-622"]],
+      "compatibility": { "wheel_size": "700c", "tire_width_mm": 61 }
+    },
+    {
+      "slug": "demo-mtb-tire-29x2-2", "brand": "velox-demo-works", "category": "tires",
+      "name": "Demo XC Tire 29×2.2", "model": "XT-22", "material": "Rubber",
+      "weight_g": 720, "price_reference": 55, "currency": "EUR",
+      "description": "Sample 29×2.2\" cross-country tire.",
+      "specs": [["etrto", "ETRTO", "56-622"]],
+      "compatibility": { "wheel_size": "700c", "tire_width_mm": 56 }
+    },
+    {
+      "slug": "demo-alloy-flat-bar-780", "brand": "velox-demo-works", "category": "handlebars",
+      "name": "Demo Alloy Riser Bar 780", "model": "FB-780", "material": "Aluminium",
+      "weight_g": 320, "price_reference": 55, "currency": "EUR",
+      "description": "Sample flat riser bar.",
+      "specs": [["width", "Width", 780, "mm"], ["rise", "Rise", 20, "mm"], ["backsweep", "Backsweep", 9, "°"]],
+      "compatibility": { "clamp_mm": 35 }
+    },
+    {
+      "slug": "demo-carbon-flat-bar-760", "brand": "velox-demo-works", "category": "handlebars",
+      "name": "Demo Carbon Flat Bar 760", "model": "FB-760", "material": "Carbon fibre",
+      "weight_g": 210, "price_reference": 140, "currency": "EUR",
+      "description": "Sample flat bar; rise and backsweep are not recorded.",
+      "specs": [["width", "Width", 760, "mm"]],
+      "compatibility": { "clamp_mm": 35 }
+    },
+    {
+      "slug": "demo-alloy-riser-bar-unspecified", "brand": "velox-demo-works", "category": "handlebars",
+      "name": "Demo Alloy Riser Bar (width not recorded)", "model": "FB-X", "material": "Aluminium",
+      "weight_g": 330, "price_reference": 40, "currency": "EUR",
+      "description": "Sample riser bar whose width is not recorded.",
+      "specs": [["rise", "Rise", 30, "mm"]],
+      "compatibility": { "clamp_mm": 35 }
+    },
+    {
+      "slug": "demo-alloy-mtb-stem-50", "brand": "velox-demo-works", "category": "stems",
+      "name": "Demo Alloy MTB Stem 50 mm (35 mm clamp)", "model": "MS-50", "material": "Aluminium",
+      "weight_g": 140, "price_reference": 45, "currency": "EUR",
+      "description": "Sample short trail stem.",
+      "specs": [["length", "Length", 50, "mm"], ["angle", "Angle", 0, "°"]],
+      "compatibility": { "steerer_clamp_mm": 28.6, "handlebar_clamp_mm": 35 }
+    },
+    {
+      "slug": "demo-alloy-mtb-stem-70", "brand": "velox-demo-works", "category": "stems",
+      "name": "Demo Alloy MTB Stem 70 mm (35 mm clamp, +6°)", "model": "MS-70", "material": "Aluminium",
+      "weight_g": 160, "price_reference": 45, "currency": "EUR",
+      "description": "Sample cross-country stem.",
+      "specs": [["length", "Length", 70, "mm"], ["angle", "Angle", 6, "°"]],
+      "compatibility": { "steerer_clamp_mm": 28.6, "handlebar_clamp_mm": 35 }
+    },
+    {
+      "slug": "demo-m12-crankset-170-32", "brand": "velox-demo-works", "category": "cranksets",
+      "name": "Demo M12 Crankset 170 mm, 32T", "model": "MC-170", "material": "Aluminium",
+      "weight_g": 620, "price_reference": 180, "currency": "EUR",
+      "description": "Sample 1× MTB crankset.",
+      "specs": [["chainrings", "Chainrings", "32", "T"], ["crank_length", "Crank length", 170, "mm"]],
+      "compatibility": { "speeds": 12, "bb_shells": ["bsa_73"] }
+    },
+    {
+      "slug": "demo-m12-crankset-175-30", "brand": "velox-demo-works", "category": "cranksets",
+      "name": "Demo M12 Crankset 175 mm, 30T", "model": "MC-175", "material": "Aluminium",
+      "weight_g": 640, "price_reference": 180, "currency": "EUR",
+      "description": "Sample 1× MTB crankset with longer arms and a smaller ring.",
+      "specs": [["chainrings", "Chainrings", "30", "T"], ["crank_length", "Crank length", 175, "mm"]],
+      "compatibility": { "speeds": 12, "bb_shells": ["bsa_73"] }
+    },
+    {
+      "slug": "demo-m12-cassette-10-51-ms", "brand": "velox-demo-works", "category": "cassettes",
+      "name": "Demo M12 Cassette 10–51 (Micro Spline)", "model": "MK-1051", "material": "Steel / aluminium",
+      "weight_g": 470, "price_reference": 120, "currency": "EUR",
+      "description": "Sample 12-speed MTB cassette.",
+      "specs": [["cogs", "Cogs", "10,12,14,16,18,21,24,28,33,39,45,51", "T"], ["speeds", "Speeds", 12]],
+      "compatibility": { "speeds": 12, "freehub_body": "shimano_microspline", "largest_cog": 51 }
+    },
+    {
+      "slug": "demo-x12-cassette-10-52-xd", "brand": "velox-demo-works", "category": "cassettes",
+      "name": "Demo X12 Cassette 10–52 (XD)", "model": "XK-1052", "material": "Steel / aluminium",
+      "weight_g": 450, "price_reference": 160, "currency": "EUR",
+      "description": "Sample 12-speed MTB cassette for XD driver bodies.",
+      "specs": [["cogs", "Cogs", "10,12,14,16,18,21,24,28,32,36,42,52", "T"], ["speeds", "Speeds", 12]],
+      "compatibility": { "speeds": 12, "freehub_body": "sram_xd", "largest_cog": 52 }
+    },
+    {
+      "slug": "demo-m12-chain", "brand": "velox-demo-works", "category": "chains",
+      "name": "Demo M12 Chain", "model": "MCH-12", "material": "Steel",
+      "weight_g": 250, "price_reference": 35, "currency": "EUR",
+      "description": "Sample 12-speed MTB chain.",
+      "specs": [["speeds", "Speeds", 12], ["links", "Links", 126]],
+      "compatibility": { "speeds": 12 }
+    },
+    {
+      "slug": "demo-rotor-203-6bolt", "brand": "velox-demo-works", "category": "brake-rotors",
+      "name": "Demo Rotor 203 mm 6-Bolt", "model": "RT-203", "material": "Steel",
+      "weight_g": 210, "price_reference": 40, "currency": "EUR",
+      "description": "Sample large 6-bolt rotor.",
+      "compatibility": { "rotor_diameter_mm": 203, "rotor_mount": "six_bolt" }
     }
   ]
 }

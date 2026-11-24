@@ -19,6 +19,7 @@ export interface AttributeDef {
 
 const BB_SHELLS = {
   bsa_68: "BSA threaded 68 mm",
+  bsa_73: "BSA threaded 73 mm",
   t47_86: "T47 threaded 86 mm (internal)",
   pf86: "Press-fit 86.5 mm",
   bb386: "BB386 EVO",
@@ -29,6 +30,7 @@ const AXLES = {
   "12x100_ta": "12×100 mm thru-axle",
   "12x142_ta": "12×142 mm thru-axle",
   "12x148_ta": "12×148 mm Boost thru-axle",
+  "15x110_ta": "15×110 mm Boost thru-axle",
   "100_qr": "100 mm quick-release",
   "130_qr": "130 mm quick-release",
   "135_qr": "135 mm quick-release",

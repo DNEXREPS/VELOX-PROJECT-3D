@@ -106,7 +106,9 @@ await step("CSP header with a per-request nonce on every page; all framework scr
   const b = await fetch(`${BASE}/`);
   const csp = a.headers.get("content-security-policy") ?? "";
   assert(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' 'strict-dynamic'/.test(csp), "script-src nonce missing");
-  assert(!/script-src[^;]*unsafe-(inline|eval)/.test(csp), "unsafe script source");
+  const scriptTokens = (/script-src ([^;]*)/.exec(csp)?.[1] ?? "").split(" ");
+  assert(!scriptTokens.includes("'unsafe-inline'") && !scriptTokens.includes("'unsafe-eval'"), "unsafe script source");
+  assert(scriptTokens.includes("'wasm-unsafe-eval'"), "WebAssembly decoders not permitted");
   assert(csp !== b.headers.get("content-security-policy"), "nonce is reused across requests");
   const nonce = /nonce-([^']+)/.exec(csp)[1];
   const html = await a.text();
@@ -144,7 +146,9 @@ await step("no CSP violations on public and private pages, including the 3D stud
     if (path === "/" || path.endsWith("/studio")) {
       await page.locator("canvas").first().waitFor({ timeout: 20000 });
       await page.waitForTimeout(1500);
-      assert((await page.locator("[data-testid=bike-viewer] canvas").count()) > 0, `3D canvas missing on ${path}`);
+      // With NEXT_PUBLIC_ASSEMBLY_ENGINE=1 the studio renders the modular viewer instead of the classic one.
+      const viewer = path.endsWith("/studio") && process.env.E2E_ASSEMBLY_ENGINE === "1" ? "assembly-canvas" : "bike-viewer";
+      assert((await page.locator(`[data-testid=${viewer}] canvas`).count()) > 0, `3D canvas (${viewer}) missing on ${path}`);
     } else {
       await page.waitForLoadState("networkidle");
     }

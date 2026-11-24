@@ -111,7 +111,12 @@ await step("studio: select parts, check compatibility, preview and save a revisi
   await hg.getByRole("button", { name: "Preview" }).click();
   await addPart("Rear tire", "Demo Gravel Tire 700×40");
   await expectText(page, "Incompatible"); // 40mm tire vs 32mm clearance in pending panel
-  await expectText(page, "tire geometry scaled to 40 mm");
+  // Classic viewer scales the tire; the modular engine (NEXT_PUBLIC_ASSEMBLY_ENGINE=1) regenerates it.
+  if (process.env.E2E_ASSEMBLY_ENGINE === "1") {
+    await page.getByTestId("geometry-rear_tire").filter({ hasText: "Generated from recorded dimensions" }).last().waitFor({ timeout: 15000 });
+  } else {
+    await expectText(page, "tire geometry scaled to 40 mm");
+  }
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${SHOTS}/03-studio-pending.png` });
   // Swap the tire for a compatible one, then save.
